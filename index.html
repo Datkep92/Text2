@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Lọc bài quảng cáo Facebook</title>
+</head>
+<body>
+  <h2>Bấm để lấy link bài quảng cáo trên m.facebook.com</h2>
+  <button onclick="findSponsored()">Lọc quảng cáo</button>
+
+  <script>
+    function findSponsored() {
+      const links = [];
+      document.querySelectorAll('article').forEach(article => {
+        if (article.innerText.includes('Được tài trợ')) {
+          const a = article.querySelector('a[href*="/story.php"], a[href*="/posts/"]');
+          if (a && a.href) links.push(a.href);
+        }
+      });
+      if (links.length > 0) {
+        alert(`Tìm thấy ${links.length} bài quảng cáo:\n\n` + links.join('\n'));
+        console.log('Ad links:', links);
+      } else {
+        alert('Không tìm thấy bài quảng cáo nào có "Được tài trợ".');
+      }
+    }
+  </script>
+</body>
+</html>
