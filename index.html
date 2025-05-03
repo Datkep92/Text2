@@ -1,29 +1,65 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <title>Lọc bài quảng cáo Facebook</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1em;
+      background: #f2f2f2;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #4267B2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+    }
+    #result {
+      margin-top: 1em;
+      white-space: pre-wrap;
+      background: white;
+      padding: 1em;
+      border-radius: 8px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+  </style>
 </head>
 <body>
-  <h2>Bấm để lấy link bài quảng cáo trên m.facebook.com</h2>
+
+  <h2>Lọc bài quảng cáo trên Facebook</h2>
+  <p>1. Mở Safari truy cập: <strong>https://m.facebook.com</strong><br>
+     2. Cuộn để load các bài viết<br>
+     3. Quay lại tab này và bấm nút dưới để lọc</p>
+
   <button onclick="findSponsored()">Lọc quảng cáo</button>
+
+  <div id="result"></div>
 
   <script>
     function findSponsored() {
-      const links = [];
+      const results = [];
       document.querySelectorAll('article').forEach(article => {
         if (article.innerText.includes('Được tài trợ')) {
           const a = article.querySelector('a[href*="/story.php"], a[href*="/posts/"]');
-          if (a && a.href) links.push(a.href);
+          if (a && a.href && !results.includes(a.href)) {
+            results.push(a.href);
+          }
         }
       });
-      if (links.length > 0) {
-        alert(`Tìm thấy ${links.length} bài quảng cáo:\n\n` + links.join('\n'));
-        console.log('Ad links:', links);
+
+      const resultBox = document.getElementById('result');
+      if (results.length > 0) {
+        resultBox.innerText = `Đã tìm thấy ${results.length} bài quảng cáo:\n\n` + results.join('\n');
       } else {
-        alert('Không tìm thấy bài quảng cáo nào có "Được tài trợ".');
+        resultBox.innerText = 'Không tìm thấy bài quảng cáo nào có "Được tài trợ".';
       }
     }
   </script>
+
 </body>
 </html>
