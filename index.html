@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Copy Link Facebook</title>
+    <title>Quét và Sao chép Link Bài viết Facebook</title>
     <style>
         /* CSS cho nút nổi */
-        #copyButton {
+        #copyAllButton {
             position: fixed;
             bottom: 20px;
             right: 20px;
@@ -19,7 +19,7 @@
             cursor: pointer;
         }
 
-        #copyButton:hover {
+        #copyAllButton:hover {
             background-color: #365899;
         }
     </style>
@@ -27,28 +27,37 @@
 <body>
 
     <!-- Nút nổi -->
-    <button id="copyButton">Sao chép Link</button>
+    <button id="copyAllButton">Sao chép tất cả Link bài viết</button>
 
     <script>
-        // JavaScript sao chép link bài viết Facebook
-        document.getElementById('copyButton').addEventListener('click', function() {
-            // Lấy link bài viết Facebook (có thể thay đổi tùy theo cách lấy URL từ trang)
-            var url = window.location.href;
-
-            // Tạo một trường input tạm thời để copy link
-            var tempInput = document.createElement('input');
-            tempInput.value = url;
-            document.body.appendChild(tempInput);
-
-            // Chọn và sao chép nội dung của input
-            tempInput.select();
-            document.execCommand('copy');
-
-            // Xoá input tạm thời
-            document.body.removeChild(tempInput);
-
-            // Thông báo đã sao chép
-            alert('Đã sao chép link bài viết!');
+        // Hàm sao chép tất cả các link bài viết trên trang Facebook
+        document.getElementById('copyAllButton').addEventListener('click', function() {
+            // Lấy tất cả các link bài viết trên Facebook (sử dụng selector để tìm các bài viết)
+            var links = document.querySelectorAll('a[href^="https://www.facebook.com/"]');
+            var copiedLinks = [];
+            
+            links.forEach(function(link) {
+                // Kiểm tra nếu đó là một bài viết (có thể có thêm điều kiện tùy vào cấu trúc của trang)
+                if (link.href.includes('/posts/')) {
+                    copiedLinks.push(link.href);
+                }
+            });
+            
+            if (copiedLinks.length > 0) {
+                // Tạo một chuỗi các link và sao chép vào clipboard
+                var textToCopy = copiedLinks.join('\n');
+                var tempInput = document.createElement('textarea');
+                tempInput.value = textToCopy;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                
+                // Thông báo đã sao chép
+                alert('Đã sao chép ' + copiedLinks.length + ' link bài viết!');
+            } else {
+                alert('Không tìm thấy bài viết để sao chép!');
+            }
         });
     </script>
 
