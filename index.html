@@ -2,64 +2,71 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Lọc bài quảng cáo Facebook</title>
+  <title>Quét bài viết Facebook (cho iPhone)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 1em;
-      background: #f2f2f2;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-      background-color: #4267B2;
-      color: white;
-      border: none;
-      border-radius: 6px;
-    }
-    #result {
-      margin-top: 1em;
-      white-space: pre-wrap;
-      background: white;
-      padding: 1em;
-      border-radius: 8px;
-      max-height: 400px;
-      overflow-y: auto;
-    }
+    body { font-family: sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 200px; font-size: 14px; margin-top: 10px; }
+    button { padding: 10px 16px; font-size: 16px; margin-top: 10px; margin-right: 10px; }
+    #output { white-space: pre-wrap; background: #f1f1f1; border: 1px solid #ccc; padding: 10px; margin-top: 20px; }
+    code { background: #eee; padding: 2px 4px; }
   </style>
 </head>
 <body>
 
-  <h2>Lọc bài quảng cáo trên Facebook</h2>
-  <p>1. Mở Safari truy cập: <strong>https://m.facebook.com</strong><br>
-     2. Cuộn để load các bài viết<br>
-     3. Quay lại tab này và bấm nút dưới để lọc</p>
+  <h2>Trích xuất bài viết Facebook (iPhone)</h2>
 
-  <button onclick="findSponsored()">Lọc quảng cáo</button>
+  <h3>Bước 1: Thêm Bookmarklet</h3>
+  <p>Copy đoạn sau và tạo <b>bookmark</b> mới trong Safari (đặt tên là “Lấy HTML Facebook”):</p>
+  <textarea readonly onclick="this.select()">
+javascript:(function(){const html=document.documentElement.outerHTML;const w=window.open();w.document.write(`<textarea style='width:100%;height:100%'>${html}</textarea>`);})();
+  </textarea>
+  <p>Trên Facebook.com, bạn chỉ cần bấm bookmark này, trang sẽ mở toàn bộ HTML. Copy đoạn đó.</p>
 
-  <div id="result"></div>
+  <h3>Bước 2: Dán mã HTML vào đây</h3>
+  <textarea id="htmlInput" placeholder="Dán mã HTML từ Facebook..."></textarea>
+  <br>
+  <button onclick="extractLinks()">Quét bài viết</button>
+  <button onclick="saveAsText()">Tải xuống .txt</button>
+
+  <h3>Kết quả:</h3>
+  <div id="output">Chưa có dữ liệu.</div>
 
   <script>
-    function findSponsored() {
-      const results = [];
-      document.querySelectorAll('article').forEach(article => {
-        if (article.innerText.includes('Được tài trợ')) {
-          const a = article.querySelector('a[href*="/story.php"], a[href*="/posts/"]');
-          if (a && a.href && !results.includes(a.href)) {
-            results.push(a.href);
-          }
+    let lastResult = '';
+
+    function extractLinks() {
+      const html = document.getElementById("htmlInput").value;
+      const container = document.createElement("div");
+      container.innerHTML = html;
+
+      const links = new Set();
+      const articles = container.querySelectorAll('article');
+
+      articles.forEach(article => {
+        const text = article.innerText || '';
+        const isSponsored = /Sponsored|Được tài trợ/i.test(text);
+        const a = article.querySelector('a[href*="/posts/"], a[href*="/story.php"], a[href*="/l.php"], a[href*="/ads/"]');
+
+        if (a) {
+          let href = a.getAttribute('href');
+          if (!href.startsWith('http')) href = 'https://facebook.com' + href;
+          links.add((isSponsored ? '[Ad] ' : '') + href);
         }
       });
 
-      const resultBox = document.getElementById('result');
-      if (results.length > 0) {
-        resultBox.innerText = `Đã tìm thấy ${results.length} bài quảng cáo:\n\n` + results.join('\n');
-      } else {
-        resultBox.innerText = 'Không tìm thấy bài quảng cáo nào có "Được tài trợ".';
-      }
+      lastResult = Array.from(links).join('\n');
+      document.getElementById("output").innerText = lastResult || 'Không tìm thấy bài viết nào.';
+    }
+
+    function saveAsText() {
+      if (!lastResult) return alert('Chưa có dữ liệu để lưu!');
+      const blob = new Blob([lastResult], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'facebook-links.txt';
+      a.click();
     }
   </script>
-
 </body>
 </html>
