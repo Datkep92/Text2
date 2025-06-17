@@ -1,65 +1,137 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quét và Sao chép Link Bài viết Facebook</title>
-    <style>
-        /* CSS cho nút nổi */
-        #copyAllButton {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            background-color: #4267B2;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        #copyAllButton:hover {
-            background-color: #365899;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Quản lý Hộ KD - Tự động từ Hóa Đơn</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <style>
+    body { font-family: Arial; margin: 0; padding: 0; display: flex; height: 100vh; }
+    .sidebar { width: 250px; background: #f1f1f1; padding: 15px; overflow-y: auto; }
+    .main { flex: 1; padding: 20px; overflow-y: auto; }
+    button { margin: 5px 0; padding: 8px; font-size: 14px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 6px; border: 1px solid #ccc; text-align: left; }
+    .total-summary { margin-top: 15px; font-weight: bold; }
+    input[type="file"] { margin: 10px 0; }
+  </style>
 </head>
 <body>
 
-    <!-- Nút nổi -->
-    <button id="copyAllButton">Sao chép tất cả Link bài viết</button>
+  <div class="sidebar">
+    <h3>📂 Hộ KD</h3>
+    <ul id="hkdList"></ul>
+  </div>
 
-    <script>
-        // Hàm sao chép tất cả các link bài viết trên trang Facebook
-        document.getElementById('copyAllButton').addEventListener('click', function() {
-            // Lấy tất cả các link bài viết trên Facebook (sử dụng selector để tìm các bài viết)
-            var links = document.querySelectorAll('a[href^="https://www.facebook.com/"]');
-            var copiedLinks = [];
-            
-            links.forEach(function(link) {
-                // Kiểm tra nếu đó là một bài viết (có thể có thêm điều kiện tùy vào cấu trúc của trang)
-                if (link.href.includes('/posts/')) {
-                    copiedLinks.push(link.href);
-                }
-            });
-            
-            if (copiedLinks.length > 0) {
-                // Tạo một chuỗi các link và sao chép vào clipboard
-                var textToCopy = copiedLinks.join('\n');
-                var tempInput = document.createElement('textarea');
-                tempInput.value = textToCopy;
-                document.body.appendChild(tempInput);
-                tempInput.select();
-                document.execCommand('copy');
-                document.body.removeChild(tempInput);
-                
-                // Thông báo đã sao chép
-                alert('Đã sao chép ' + copiedLinks.length + ' link bài viết!');
-            } else {
-                alert('Không tìm thấy bài viết để sao chép!');
-            }
-        });
-    </script>
+  <div class="main">
+    <h2>📥 Nhập hóa đơn (PDF)</h2>
+    <input type="file" id="pdfFile" accept="application/pdf" />
+    <button onclick="xuLyPDF()">Tải và xử lý PDF</button>
 
+    <div id="thongTinHKD"></div>
+    <div id="bangHang"></div>
+  </div>
+
+  <script>
+    let ds = JSON.parse(localStorage.getItem('DS_HKD') || '[]');
+    let curHKD = null;
+
+    function saveDS() {
+      localStorage.setItem('DS_HKD', JSON.stringify(ds));
+    }
+
+    function renderDanhSach() {
+      const ul = document.getElementById('hkdList');
+      ul.innerHTML = '';
+      ds.forEach(h => {
+        const li = document.createElement('li');
+        li.textContent = h.ten;
+        li.style.cursor = 'pointer';
+        li.onclick = () => {
+          curHKD = h;
+          renderChiTietHKD();
+        };
+        ul.appendChild(li);
+      });
+    }
+
+    function renderChiTietHKD() {
+      if (!curHKD) return;
+      document.getElementById('thongTinHKD').innerHTML = `<h3>📌 ${curHKD.ten}</h3>`;
+      let html = `<table>
+        <tr><th>Tên hàng</th><th>SL</th><th>Giá</th><th>NPP</th><th>Tổng tiền</th></tr>`;
+      let tongSL = 0, tongTien = 0;
+      curHKD.hang.forEach(h => {
+        const tt = h.sl * h.gia;
+        tongSL += h.sl;
+        tongTien += tt;
+        html += `<tr>
+          <td>${h.ten}</td>
+          <td>${h.sl}</td>
+          <td>${h.gia.toLocaleString()}</td>
+          <td>${h.npp}</td>
+          <td>${tt.toLocaleString()}</td>
+        </tr>`;
+      });
+      html += `</table>`;
+      html += `<div class="total-summary">Tổng SL: ${tongSL} | Tổng tiền: ${tongTien.toLocaleString()} đ</div>`;
+      document.getElementById('bangHang').innerHTML = html;
+    }
+
+    async function xuLyPDF() {
+      const file = document.getElementById('pdfFile').files[0];
+      if (!file) return alert('Chọn file PDF!');
+      const buffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const txt = content.items.map(i => i.str).join(' ');
+        fullText += txt + '\n';
+      }
+      processPDFContent(fullText);
+    }
+
+    function processPDFContent(text) {
+      const tenHKD = (text.match(/Hộ Kinh Doanh\s*[:\-]?\s*(.+)/i) || [])[1]?.trim() || 'Chưa rõ';
+      const npp = (text.match(/Nhà Phân Phối\s*[:\-]?\s*(.+)/i) || [])[1]?.trim() || 'Không rõ';
+
+      let hkd = ds.find(h => h.ten === tenHKD);
+      if (!hkd) {
+        hkd = { ten: tenHKD, hang: [] };
+        ds.push(hkd);
+      }
+      curHKD = hkd;
+
+      // Xử lý hàng hoá theo dòng có: "Tên SP  Số lượng  Giá"
+      const lines = text.split('\n');
+      lines.forEach(line => {
+        const match = line.match(/(.+?)\s+(\d+)\s+([\d,.]+)/);
+        if (match) {
+          const ten = match[1].trim();
+          const sl = parseInt(match[2]);
+          const gia = parseFloat(match[3].replace(/[,.]/g, ''));
+
+          if (!ten || isNaN(sl) || isNaN(gia)) return;
+
+          // tìm hàng trùng theo tên + NPP
+          const sp = hkd.hang.find(h => h.ten === ten && h.npp === npp);
+          if (sp) {
+            sp.sl += sl;
+            sp.gia = gia; // cập nhật giá mới
+          } else {
+            hkd.hang.push({ ten, sl, gia, npp });
+          }
+        }
+      });
+
+      saveDS();
+      renderDanhSach();
+      renderChiTietHKD();
+      alert('✅ Đã xử lý hóa đơn cho Hộ KD: ' + tenHKD);
+    }
+
+    renderDanhSach();
+  </script>
 </body>
 </html>
