@@ -2,30 +2,31 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <title>Quản lý Hộ KD - Tự động từ Hóa Đơn</title>
+  <title>Trích xuất hóa đơn PDF - Quản lý Hộ KD</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
   <style>
-    body { font-family: Arial; margin: 0; padding: 0; display: flex; height: 100vh; }
-    .sidebar { width: 250px; background: #f1f1f1; padding: 15px; overflow-y: auto; }
+    body { margin: 0; font-family: Arial; display: flex; height: 100vh; }
+    .sidebar { width: 250px; padding: 15px; background: #f0f0f0; overflow-y: auto; }
     .main { flex: 1; padding: 20px; overflow-y: auto; }
-    button { margin: 5px 0; padding: 8px; font-size: 14px; cursor: pointer; }
+    button, input[type=file] { margin: 8px 0; padding: 8px; font-size: 14px; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 6px; background: #fff; border: 1px solid #ccc; margin-bottom: 4px; cursor: pointer; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { padding: 6px; border: 1px solid #ccc; text-align: left; }
-    .total-summary { margin-top: 15px; font-weight: bold; }
-    input[type="file"] { margin: 10px 0; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    .total { margin-top: 10px; font-weight: bold; }
   </style>
 </head>
 <body>
 
   <div class="sidebar">
-    <h3>📂 Hộ KD</h3>
+    <h3>📂 Danh sách Hộ KD</h3>
     <ul id="hkdList"></ul>
   </div>
 
   <div class="main">
-    <h2>📥 Nhập hóa đơn (PDF)</h2>
+    <h2>📥 Tải hóa đơn PDF</h2>
     <input type="file" id="pdfFile" accept="application/pdf" />
-    <button onclick="xuLyPDF()">Tải và xử lý PDF</button>
+    <button onclick="xuLyPDF()">Xử lý hóa đơn</button>
 
     <div id="thongTinHKD"></div>
     <div id="bangHang"></div>
@@ -45,20 +46,19 @@
       ds.forEach(h => {
         const li = document.createElement('li');
         li.textContent = h.ten;
-        li.style.cursor = 'pointer';
         li.onclick = () => {
           curHKD = h;
-          renderChiTietHKD();
+          renderChiTiet();
         };
         ul.appendChild(li);
       });
     }
 
-    function renderChiTietHKD() {
+    function renderChiTiet() {
       if (!curHKD) return;
       document.getElementById('thongTinHKD').innerHTML = `<h3>📌 ${curHKD.ten}</h3>`;
       let html = `<table>
-        <tr><th>Tên hàng</th><th>SL</th><th>Giá</th><th>NPP</th><th>Tổng tiền</th></tr>`;
+        <tr><th>Tên hàng</th><th>ĐVT</th><th>SL</th><th>Đơn giá</th><th>Nhà phân phối</th><th>Tổng tiền</th></tr>`;
       let tongSL = 0, tongTien = 0;
       curHKD.hang.forEach(h => {
         const tt = h.sl * h.gia;
@@ -66,6 +66,7 @@
         tongTien += tt;
         html += `<tr>
           <td>${h.ten}</td>
+          <td>${h.dvt || ''}</td>
           <td>${h.sl}</td>
           <td>${h.gia.toLocaleString()}</td>
           <td>${h.npp}</td>
@@ -73,7 +74,7 @@
         </tr>`;
       });
       html += `</table>`;
-      html += `<div class="total-summary">Tổng SL: ${tongSL} | Tổng tiền: ${tongTien.toLocaleString()} đ</div>`;
+      html += `<div class="total">Tổng SL: ${tongSL} | Tổng tiền: ${tongTien.toLocaleString()} đ</div>`;
       document.getElementById('bangHang').innerHTML = html;
     }
 
@@ -86,49 +87,50 @@
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
-        const txt = content.items.map(i => i.str).join(' ');
-        fullText += txt + '\n';
+        fullText += content.items.map(i => i.str).join(' ') + '\\n';
       }
       processPDFContent(fullText);
     }
 
     function processPDFContent(text) {
-      const tenHKD = (text.match(/Hộ Kinh Doanh\s*[:\-]?\s*(.+)/i) || [])[1]?.trim() || 'Chưa rõ';
-      const npp = (text.match(/Nhà Phân Phối\s*[:\-]?\s*(.+)/i) || [])[1]?.trim() || 'Không rõ';
+      const tenHKD = (text.match(/Tên người mua\\s*[:\\-]?\\s*(.+)/i) || [])[1]?.trim() || 'Chưa rõ';
+      const tenNPP = (text.match(/Tên người bán\\s*[:\\-]?\\s*(.+)/i) || [])[1]?.trim() || 'Không rõ';
 
+      if (!tenHKD) return alert("Không tìm thấy người mua!");
       let hkd = ds.find(h => h.ten === tenHKD);
       if (!hkd) {
         hkd = { ten: tenHKD, hang: [] };
         ds.push(hkd);
       }
+
       curHKD = hkd;
 
-      // Xử lý hàng hoá theo dòng có: "Tên SP  Số lượng  Giá"
-      const lines = text.split('\n');
+      const lines = text.split('\\n');
+      const regexSP = /(.+?)\\s+(Thùng|Chai|Gói|Túi|Hộp|Kg|Tấm)\\s+(\\d+)\\s+([\\d.,]+)\\s+\\d+%\\s+([\\d.,]+)/i;
+
       lines.forEach(line => {
-        const match = line.match(/(.+?)\s+(\d+)\s+([\d,.]+)/);
-        if (match) {
-          const ten = match[1].trim();
-          const sl = parseInt(match[2]);
-          const gia = parseFloat(match[3].replace(/[,.]/g, ''));
+        const m = line.match(regexSP);
+        if (m) {
+          const ten = m[1].trim();
+          const dvt = m[2];
+          const sl = parseInt(m[3]);
+          const gia = parseFloat(m[4].replace(/[.,]/g, ''));
+          const thanhtien = parseFloat(m[5].replace(/[.,]/g, ''));
 
-          if (!ten || isNaN(sl) || isNaN(gia)) return;
-
-          // tìm hàng trùng theo tên + NPP
-          const sp = hkd.hang.find(h => h.ten === ten && h.npp === npp);
+          const sp = hkd.hang.find(h => h.ten === ten && h.npp === tenNPP);
           if (sp) {
             sp.sl += sl;
-            sp.gia = gia; // cập nhật giá mới
+            sp.thanhtien += thanhtien;
           } else {
-            hkd.hang.push({ ten, sl, gia, npp });
+            hkd.hang.push({ ten, dvt, sl, gia, npp: tenNPP, thanhtien });
           }
         }
       });
 
       saveDS();
       renderDanhSach();
-      renderChiTietHKD();
-      alert('✅ Đã xử lý hóa đơn cho Hộ KD: ' + tenHKD);
+      renderChiTiet();
+      alert(`✅ Đã xử lý cho Hộ KD: ${tenHKD}`);
     }
 
     renderDanhSach();
