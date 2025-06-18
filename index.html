@@ -1,50 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice Extraction and Inventory Management</title>
+    <title>Trích Xuất Hóa Đơn Đơn Giản</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
+            margin: 20px;
             line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            color: #333;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto;
         }
         h1, h2 {
             color: #2c3e50;
         }
         .section {
-            margin-bottom: 30px;
-            padding: 20px;
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
             border-radius: 5px;
-            background-color: #f9f9f9;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .flex-container {
-            display: flex;
-            gap: 20px;
-        }
-        .upload-section {
-            flex: 1;
-        }
-        .results-section {
-            flex: 2;
         }
         textarea {
             width: 100%;
-            height: 200px;
+            height: 150px;
             padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            resize: vertical;
+            margin-bottom: 10px;
         }
         button {
             background-color: #3498db;
@@ -53,8 +38,7 @@
             padding: 10px 15px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
+            margin-right: 10px;
         }
         button:hover {
             background-color: #2980b9;
@@ -62,7 +46,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-top: 15px;
         }
         th, td {
             border: 1px solid #ddd;
@@ -72,172 +56,112 @@
         th {
             background-color: #f2f2f2;
         }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        .progress-container {
+        .progress {
             margin-top: 10px;
             display: none;
-        }
-        progress {
-            width: 100%;
         }
         .status {
             margin-top: 5px;
             font-size: 14px;
             color: #666;
         }
-        .search-section {
-            margin-bottom: 20px;
-        }
-        input[type="text"] {
-            padding: 8px;
-            width: 300px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .invoice-details {
-            margin-top: 20px;
-        }
-        .inventory-summary {
-            margin-top: 30px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Invoice Extraction and Inventory Management</h1>
+        <h1>Trích Xuất Hóa Đơn Đơn Giản</h1>
         
-        <div class="flex-container">
-            <div class="section upload-section">
-                <h2>Upload Invoice PDF</h2>
-                <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg">
-                <div class="progress-container" id="progressContainer">
-                    <progress id="progressBar" value="0" max="100"></progress>
-                    <div class="status" id="status">Ready</div>
-                </div>
-                <button id="extractBtn">Extract Data</button>
+        <div class="section">
+            <h2>Tải lên hóa đơn PDF</h2>
+            <input type="file" id="fileInput" accept=".pdf">
+            <div class="progress" id="progressContainer">
+                <progress id="progressBar" value="0" max="100"></progress>
+                <div class="status" id="status">Sẵn sàng</div>
             </div>
-            
-            <div class="section results-section">
-                <h2>Extracted Data</h2>
-                <textarea id="extractedText" readonly></textarea>
-                <div class="invoice-details" id="invoiceDetails"></div>
-            </div>
-        </div>
-        
-        <div class="section search-section">
-            <h2>Search Invoices</h2>
-            <div>
-                <label for="searchBuyer">Search by Buyer Name:</label>
-                <input type="text" id="searchBuyer" placeholder="Enter buyer name">
-                <button id="searchBuyerBtn">Search</button>
-            </div>
-            <div style="margin-top: 10px;">
-                <label for="searchInvoice">Search by Invoice Number:</label>
-                <input type="text" id="searchInvoice" placeholder="Enter invoice number">
-                <button id="searchInvoiceBtn">Search</button>
-            </div>
+            <button id="extractBtn">Trích xuất dữ liệu</button>
         </div>
         
         <div class="section">
-            <h2>Invoice Records</h2>
-            <table id="invoiceTable">
+            <h2>Nội dung trích xuất</h2>
+            <textarea id="extractedText" readonly></textarea>
+        </div>
+        
+        <div class="section">
+            <h2>Bảng kê hàng hóa</h2>
+            <table id="itemsTable">
                 <thead>
                     <tr>
-                        <th>Invoice No.</th>
-                        <th>Date</th>
-                        <th>Buyer Name</th>
-                        <th>Buyer Tax Code</th>
-                        <th>Total Amount</th>
-                        <th>Items Count</th>
-                        <th>Actions</th>
+                        <th>STT</th>
+                        <th>Tên hàng hóa</th>
+                        <th>Đơn vị</th>
+                        <th>Số lượng</th>
+                        <th>Đơn giá</th>
+                        <th>Thành tiền</th>
                     </tr>
                 </thead>
-                <tbody id="invoiceTableBody">
-                    <!-- Invoice data will be inserted here -->
+                <tbody id="itemsTableBody">
+                    <!-- Dữ liệu hàng hóa sẽ được thêm vào đây -->
                 </tbody>
             </table>
         </div>
         
-        <div class="section inventory-summary">
-            <h2>Inventory Summary</h2>
-            <table id="inventoryTable">
+        <div class="section">
+            <h2>Chiết khấu thương mại</h2>
+            <table id="discountsTable">
                 <thead>
                     <tr>
-                        <th>Product Name</th>
-                        <th>Quantity</th>
-                        <th>Unit</th>
-                        <th>Unit Price</th>
-                        <th>Total Value</th>
-                        <th>Last Purchase Date</th>
+                        <th>Mô tả</th>
+                        <th>Giá trị</th>
                     </tr>
                 </thead>
-                <tbody id="inventoryTableBody">
-                    <!-- Inventory data will be inserted here -->
+                <tbody id="discountsTableBody">
+                    <!-- Dữ liệu chiết khấu sẽ được thêm vào đây -->
                 </tbody>
             </table>
         </div>
     </div>
 
     <script>
-        // Initialize database
-        let invoiceDatabase = JSON.parse(localStorage.getItem('invoiceDatabase')) || [];
-        let inventoryDatabase = JSON.parse(localStorage.getItem('inventoryDatabase')) || [];
+        // Khởi tạo PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
         
         // DOM elements
         const fileInput = document.getElementById('fileInput');
         const extractBtn = document.getElementById('extractBtn');
         const extractedText = document.getElementById('extractedText');
-        const invoiceDetails = document.getElementById('invoiceDetails');
         const progressContainer = document.getElementById('progressContainer');
         const progressBar = document.getElementById('progressBar');
         const status = document.getElementById('status');
-        const searchBuyer = document.getElementById('searchBuyer');
-        const searchBuyerBtn = document.getElementById('searchBuyerBtn');
-        const searchInvoice = document.getElementById('searchInvoice');
-        const searchInvoiceBtn = document.getElementById('searchInvoiceBtn');
-        const invoiceTableBody = document.getElementById('invoiceTableBody');
-        const inventoryTableBody = document.getElementById('inventoryTableBody');
+        const itemsTableBody = document.getElementById('itemsTableBody');
+        const discountsTableBody = document.getElementById('discountsTableBody');
         
-        // Initialize PDF.js worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
-        
-        // Event listeners
+        // Xử lý khi nhấn nút trích xuất
         extractBtn.addEventListener('click', processInvoice);
-        searchBuyerBtn.addEventListener('click', () => searchInvoices('buyer', searchBuyer.value));
-        searchInvoiceBtn.addEventListener('click', () => searchInvoices('invoice', searchInvoice.value));
         
-        // Load existing data on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            updateInvoiceTable();
-            updateInventoryTable();
-        });
-        
-        // Process invoice PDF
+        // Xử lý hóa đơn PDF
         async function processInvoice() {
             const file = fileInput.files[0];
             if (!file) {
-                alert('Please select a PDF file first');
+                alert('Vui lòng chọn file PDF hóa đơn trước');
                 return;
             }
             
             progressContainer.style.display = 'block';
-            status.textContent = 'Processing...';
+            status.textContent = 'Đang xử lý...';
             progressBar.value = 0;
             
             try {
-                // Convert PDF to images
+                // Chuyển PDF thành hình ảnh
                 const images = await pdfToImages(file);
                 let fullText = '';
                 
-                // Process each page with Tesseract
+                // Xử lý từng trang với Tesseract
                 for (let i = 0; i < images.length; i++) {
-                    status.textContent = `Processing page ${i + 1} of ${images.length}...`;
+                    status.textContent = `Đang xử lý trang ${i + 1} của ${images.length}...`;
                     
                     const result = await Tesseract.recognize(
                         images[i],
-                        'vie+eng', // Vietnamese and English
+                        'vie+eng', // Tiếng Việt và tiếng Anh
                         {
                             logger: m => {
                                 if (m.status === 'recognizing text') {
@@ -253,21 +177,17 @@
                 
                 extractedText.value = fullText;
                 
-                // Parse invoice data
-                const invoiceData = parseInvoiceData(fullText);
-                displayInvoiceDetails(invoiceData);
+                // Phân tích dữ liệu từ nội dung trích xuất
+                parseInvoiceTables(fullText);
                 
-                // Save to database
-                saveInvoiceData(invoiceData);
-                
-                status.textContent = 'Processing complete!';
+                status.textContent = 'Hoàn thành!';
             } catch (error) {
-                console.error('Error processing invoice:', error);
-                status.textContent = 'Error: ' + error.message;
+                console.error('Lỗi khi xử lý hóa đơn:', error);
+                status.textContent = 'Lỗi: ' + error.message;
             }
         }
         
-        // Convert PDF to images
+        // Chuyển PDF thành hình ảnh
         async function pdfToImages(file) {
             return new Promise((resolve, reject) => {
                 const fileReader = new FileReader();
@@ -305,247 +225,100 @@
             });
         }
         
-        // Parse invoice data from text
-        function parseInvoiceData(text) {
-            const invoiceData = {
-                invoiceNumber: extractValue(text, /Số:\s*([^\n]+)/) || 'N/A',
-                date: extractValue(text, /Ngày\s*(\d{2}\s*tháng\s*\d{2}\s*năm\s*\d{4})/),
-                seller: {
-                    name: extractValue(text, /Tên người bán:\s*([^\n]+)/),
-                    taxCode: extractValue(text, /Mã số thuế:\s*([^\n]+)/),
-                    address: extractValue(text, /Địa chỉ:\s*([^\n]+)/),
-                    phone: extractValue(text, /Điện thoại:\s*([^\n]+)/)
-                },
-                buyer: {
-                    name: extractValue(text, /Tên người mua:\s*([^\n]+)/) || 
-                          extractValue(text, /Họ tên người mua hàng:\s*([^\n]+)/) || 
-                          extractValue(text, /HỘ KINH DOANH\s*([^\n]+)/),
-                    taxCode: extractValue(text, /Mã số thuế:\s*([^\n]+)/, 1),
-                    address: extractValue(text, /Địa chỉ:\s*([^\n]+)/, 1)
-                },
-                paymentMethod: extractValue(text, /Hình thức thanh toán:\s*([^\n]+)/),
-                currency: extractValue(text, /Đơn vị tiền tệ:\s*([^\n]+)/),
-                items: [],
-                discounts: [],
-                totalBeforeTax: extractNumber(text, /Tổng tiền chưa thuế[^\d]*([\d.,]+)/),
-                totalTax: extractNumber(text, /Tổng tiền thuế[^\d]*([\d.,]+)/),
-                totalAmount: extractNumber(text, /Tổng tiền thanh toán bằng số[^\d]*([\d.,]+)/),
-                amountInWords: extractValue(text, /Tổng tiền thanh toán bằng chữ[^\n]*:\s*([^\n]+)/)
-            };
+        // Phân tích bảng hàng hóa và chiết khấu từ nội dung
+        function parseInvoiceTables(text) {
+            // Xóa dữ liệu cũ
+            itemsTableBody.innerHTML = '';
+            discountsTableBody.innerHTML = '';
             
-            // Extract items from table
-            const itemRegex = /(\d+)\s*\|\s*([^|]+)\s*\|\s*([^|]*)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)%?\s*\|\s*([\d.,]+)/g;
+            // Biểu thức chính quy để tìm hàng trong bảng
+            const rowRegex = /(\d+)\s*\|\s*([^|]+)\s*\|\s*([^|]*)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)%?\s*\|\s*([\d.,]+)/g;
+            
             let match;
-            
-            while ((match = itemRegex.exec(text)) !== null) {
-                if (match[2].includes('Hàng hóa') || match[2].includes('dịch vụ')) {
-                    invoiceData.items.push({
-                        stt: match[1],
-                        type: match[2].trim(),
-                        specialType: match[3].trim(),
-                        name: match[4].trim(),
-                        unit: match[5].trim(),
-                        quantity: parseFloat(match[6].replace(/\./g, '').replace(',', '.')),
-                        unitPrice: parseFloat(match[7].replace(/\./g, '').replace(',', '.')),
-                        discount: parseFloat(match[8].replace(/\./g, '').replace(',', '.')),
-                        taxRate: parseFloat(match[9].replace(',', '.')),
-                        amount: parseFloat(match[10].replace(/\./g, '').replace(',', '.'))
-                    });
-                } else if (match[2].includes('Chiết khấu')) {
-                    invoiceData.discounts.push({
-                        description: match[4].trim(),
-                        amount: parseFloat(match[10].replace(/\./g, '').replace(',', '.'))
-                    });
-                }
-            }
-            
-            return invoiceData;
-        }
-        
-        // Helper function to extract value from text
-        function extractValue(text, regex, index = 1) {
-            const match = text.match(regex);
-            return match ? match[index].trim() : null;
-        }
-        
-        // Helper function to extract number from text
-        function extractNumber(text, regex) {
-            const value = extractValue(text, regex);
-            return value ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : 0;
-        }
-        
-        // Display parsed invoice details
-        function displayInvoiceDetails(data) {
-            let html = `
-                <h3>Invoice Details</h3>
-                <p><strong>Invoice Number:</strong> ${data.invoiceNumber}</p>
-                <p><strong>Date:</strong> ${data.date}</p>
-                <p><strong>Buyer:</strong> ${data.buyer.name} (${data.buyer.taxCode})</p>
-                <p><strong>Seller:</strong> ${data.seller.name} (${data.seller.taxCode})</p>
-                <p><strong>Total Amount:</strong> ${formatCurrency(data.totalAmount)} ${data.currency}</p>
-                <p><strong>Items:</strong> ${data.items.length}</p>
+            while ((match = rowRegex.exec(text)) !== null) {
+                const rowType = match[2].trim();
                 
-                <h4>Items List</h4>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Name</th>
-                            <th>Quantity</th>
-                            <th>Unit</th>
-                            <th>Unit Price</th>
-                            <th>Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            data.items.forEach(item => {
-                html += `
-                    <tr>
-                        <td>${item.stt}</td>
-                        <td>${item.name}</td>
-                        <td>${item.quantity}</td>
-                        <td>${item.unit}</td>
-                        <td>${formatCurrency(item.unitPrice)}</td>
-                        <td>${formatCurrency(item.amount)}</td>
-                    </tr>
-                `;
-            });
-            
-            html += `
-                    </tbody>
-                </table>
-            `;
-            
-            invoiceDetails.innerHTML = html;
-        }
-        
-        // Format currency
-        function formatCurrency(amount) {
-            return new Intl.NumberFormat('vi-VN', { 
-                style: 'currency', 
-                currency: 'VND' 
-            }).format(amount);
-        }
-        
-        // Save invoice data to database
-        function saveInvoiceData(data) {
-            // Check if invoice already exists
-            const existingIndex = invoiceDatabase.findIndex(
-                inv => inv.invoiceNumber === data.invoiceNumber && inv.date === data.date
-            );
-            
-            if (existingIndex >= 0) {
-                // Update existing invoice
-                invoiceDatabase[existingIndex] = data;
-            } else {
-                // Add new invoice
-                invoiceDatabase.push(data);
+                if (rowType.includes('Hàng hóa') || rowType.includes('dịch vụ')) {
+                    // Đây là hàng hóa/dịch vụ
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${match[1]}</td>
+                        <td>${match[4].trim()}</td>
+                        <td>${match[5].trim()}</td>
+                        <td>${match[6].replace(/\./g, '').replace(',', '.')}</td>
+                        <td>${match[7].replace(/\./g, '').replace(',', '.')}</td>
+                        <td>${match[10].replace(/\./g, '').replace(',', '.')}</td>
+                    `;
+                    itemsTableBody.appendChild(row);
+                } else if (rowType.includes('Chiết khấu')) {
+                    // Đây là chiết khấu thương mại
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${match[4].trim()}</td>
+                        <td>${match[10].replace(/\./g, '').replace(',', '.')}</td>
+                    `;
+                    discountsTableBody.appendChild(row);
+                }
             }
             
-            // Update inventory
-            updateInventory(data);
-            
-            // Save to localStorage
-            localStorage.setItem('invoiceDatabase', JSON.stringify(invoiceDatabase));
-            localStorage.setItem('inventoryDatabase', JSON.stringify(inventoryDatabase));
-            
-            // Update UI
-            updateInvoiceTable();
-            updateInventoryTable();
-            
-            alert('Invoice data saved successfully!');
+            // Nếu không tìm thấy bằng regex, thử cách khác
+            if (itemsTableBody.children.length === 0) {
+                extractTablesManually(text);
+            }
         }
         
-        // Update inventory database
-        function updateInventory(invoiceData) {
-            invoiceData.items.forEach(item => {
-                const existingItem = inventoryDatabase.find(
-                    invItem => invItem.name === item.name && invItem.unit === item.unit
-                );
+        // Phương pháp dự phòng để trích xuất bảng
+        function extractTablesManually(text) {
+            const lines = text.split('\n');
+            let inItemsTable = false;
+            let inDiscountsTable = false;
+            
+            for (const line of lines) {
+                // Phát hiện bắt đầu bảng hàng hóa
+                if (line.includes('Tên hàng hóa, dịch vụ') || line.includes('Đơn vị tính')) {
+                    inItemsTable = true;
+                    inDiscountsTable = false;
+                    continue;
+                }
                 
-                if (existingItem) {
-                    // Update existing item
-                    existingItem.quantity += item.quantity;
-                    existingItem.unitPrice = item.unitPrice; // Update with latest price
-                    existingItem.lastPurchaseDate = invoiceData.date;
-                } else {
-                    // Add new item
-                    inventoryDatabase.push({
-                        name: item.name,
-                        quantity: item.quantity,
-                        unit: item.unit,
-                        unitPrice: item.unitPrice,
-                        lastPurchaseDate: invoiceData.date
-                    });
+                // Phát hiện bắt đầu bảng chiết khấu
+                if (line.includes('Chiết khấu thương mại')) {
+                    inItemsTable = false;
+                    inDiscountsTable = true;
+                    continue;
                 }
-            });
-        }
-        
-        // Update invoice table
-        function updateInvoiceTable(filteredData = null) {
-            const dataToDisplay = filteredData || invoiceDatabase;
-            
-            invoiceTableBody.innerHTML = dataToDisplay.map(invoice => `
-                <tr>
-                    <td>${invoice.invoiceNumber}</td>
-                    <td>${invoice.date}</td>
-                    <td>${invoice.buyer.name}</td>
-                    <td>${invoice.buyer.taxCode}</td>
-                    <td>${formatCurrency(invoice.totalAmount)}</td>
-                    <td>${invoice.items.length}</td>
-                    <td>
-                        <button onclick="viewInvoiceDetails('${invoice.invoiceNumber}')">View</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        // Update inventory table
-        function updateInventoryTable() {
-            inventoryTableBody.innerHTML = inventoryDatabase.map(item => `
-                <tr>
-                    <td>${item.name}</td>
-                    <td>${item.quantity}</td>
-                    <td>${item.unit}</td>
-                    <td>${formatCurrency(item.unitPrice)}</td>
-                    <td>${formatCurrency(item.quantity * item.unitPrice)}</td>
-                    <td>${item.lastPurchaseDate}</td>
-                </tr>
-            `).join('');
-        }
-        
-        // Search invoices
-        function searchInvoices(type, query) {
-            if (!query.trim()) {
-                updateInvoiceTable();
-                return;
-            }
-            
-            const filtered = invoiceDatabase.filter(invoice => {
-                if (type === 'buyer') {
-                    return invoice.buyer.name.toLowerCase().includes(query.toLowerCase());
-                } else if (type === 'invoice') {
-                    return invoice.invoiceNumber.toLowerCase().includes(query.toLowerCase());
+                
+                // Xử lý hàng hóa
+                if (inItemsTable && line.trim() && !line.includes('---')) {
+                    const columns = line.split('|').map(col => col.trim()).filter(col => col);
+                    if (columns.length >= 6) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${columns[0] || ''}</td>
+                            <td>${columns[3] || ''}</td>
+                            <td>${columns[4] || ''}</td>
+                            <td>${columns[5] ? columns[5].replace(/\./g, '').replace(',', '.') : ''}</td>
+                            <td>${columns[6] ? columns[6].replace(/\./g, '').replace(',', '.') : ''}</td>
+                            <td>${columns[9] ? columns[9].replace(/\./g, '').replace(',', '.') : ''}</td>
+                        `;
+                        itemsTableBody.appendChild(row);
+                    }
                 }
-                return false;
-            });
-            
-            updateInvoiceTable(filtered);
-        }
-        
-        // View invoice details
-        function viewInvoiceDetails(invoiceNumber) {
-            const invoice = invoiceDatabase.find(inv => inv.invoiceNumber === invoiceNumber);
-            if (invoice) {
-                extractedText.value = JSON.stringify(invoice, null, 2);
-                displayInvoiceDetails(invoice);
+                
+                // Xử lý chiết khấu
+                if (inDiscountsTable && line.trim() && !line.includes('---')) {
+                    const columns = line.split('|').map(col => col.trim()).filter(col => col);
+                    if (columns.length >= 2) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${columns[3] || ''}</td>
+                            <td>${columns[9] ? columns[9].replace(/\./g, '').replace(',', '.') : ''}</td>
+                        `;
+                        discountsTableBody.appendChild(row);
+                    }
+                }
             }
         }
-        
-        // Make functions available globally
-        window.viewInvoiceDetails = viewInvoiceDetails;
     </script>
 </body>
 </html>
