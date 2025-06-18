@@ -1,5 +1,36 @@
-<!-- Nội dung giống bản trước: khung + style + html layout -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Trích hóa đơn ➜ Phân theo HKD</title>
+  <style>
+    body { font-family: Arial; display: flex; padding: 20px; gap: 20px; }
+    #left { width: 200px; }
+    #left ul { list-style: none; padding: 0; }
+    #left li { cursor: pointer; margin: 5px 0; color: blue; text-decoration: underline; }
+    #right { flex: 1; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 5px; font-size: 13px; }
+    input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
+    .center { text-align: center; }
+    .btn-small { font-size: 11px; padding: 2px 5px; }
+  </style>
+</head>
+<body>
 
+<div id="left">
+  <h4>📋 Danh sách HKD</h4>
+  <ul id="hkdList"></ul>
+</div>
+
+<div id="right">
+  <h3>📄 Bảng kê hàng hóa</h3>
+  <input type="file" id="pdfInput" accept="application/pdf"><br>
+  <div id="status">Chưa xử lý</div>
+  <div id="output"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
@@ -28,7 +59,6 @@ function groupTextByY(items) {
 function parseInvoiceBlocks(lines) {
   const blocks = [];
   let block = [];
-
   for (const line of lines) {
     if (/^mau so|^ky hieu|^so:|^hoa don gia tri/i.test(line) && block.length) {
       blocks.push(block);
@@ -40,7 +70,6 @@ function parseInvoiceBlocks(lines) {
   return blocks;
 }
 
-// ✅ SỬA: tách tên người mua từ dòng tiếp theo nếu cần
 function getHKD(block) {
   for (let i = 0; i < block.length; i++) {
     const line = removeVN(block[i]);
@@ -86,7 +115,6 @@ function extractDataFromBlock(block) {
 
     const slRaw = last[1].replace(',', '.');
     const sl = Number(slRaw);
-    // ❌ KHÔNG LOẠI SỐ LƯỢNG = 0
     if (!Number.isFinite(sl)) continue;
 
     data.push({
@@ -106,7 +134,93 @@ function extractDataFromBlock(block) {
   return { HKD, NPP, data };
 }
 
-// phần showTableFor(...) + addRow() + updateTotals() giữ nguyên như bản trước
+function displayHKDList() {
+  const list = document.getElementById('hkdList');
+  list.innerHTML = '';
+  Object.keys(hkdData).forEach(hkd => {
+    const li = document.createElement('li');
+    li.textContent = hkd;
+    li.onclick = () => showTableFor(hkd);
+    list.appendChild(li);
+  });
+}
+
+function showTableFor(hkd) {
+  currentHKD = hkd;
+  const items = hkdData[hkd];
+  const output = document.getElementById('output');
+  if (!items || items.length === 0) {
+    output.innerHTML = '<i>Không có dữ liệu</i>';
+    return;
+  }
+
+  let html = `<button onclick="addRow()">➕ Thêm hàng thủ công</button>
+  <table id="itemTable"><thead><tr>
+    <th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th>
+    <th>Đơn giá</th><th>Chiết khấu</th><th>Thuế</th><th>Thành tiền</th>
+    <th>Loại</th><th>HKD</th><th>NPP</th><th></th>
+  </tr></thead><tbody>`;
+
+  items.forEach((p, i) => {
+    html += `<tr>
+      <td class="center">${i + 1}</td>
+      <td><input value="${p.ten}"></td>
+      <td><input value="${p.dvt}"></td>
+      <td><input class="sl" type="number" value="${p.sl}" oninput="updateTotals()"></td>
+      <td><input class="dg" type="number" value="${p.gia}" oninput="updateTotals()"></td>
+      <td><input value="${p.ck}"></td>
+      <td><input value="${p.thue}"></td>
+      <td><input class="tt" type="number" value="${p.tt}" readonly></td>
+      <td><input value="${p.loai}"></td>
+      <td><input value="${p.hkd}"></td>
+      <td><input value="${p.npp}"></td>
+      <td><button class="btn-small" onclick="this.closest('tr').remove(); updateTotals()">❌</button></td>
+    </tr>`;
+  });
+
+  html += `</tbody>
+    <tfoot><tr>
+      <td colspan="3"><b>Tổng</b></td>
+      <td id="totalQty" class="center">0</td>
+      <td colspan="3"></td>
+      <td id="totalAmt" class="center">0</td>
+      <td colspan="4"></td>
+    </tr></tfoot>
+  </table>`;
+  output.innerHTML = html;
+  updateTotals();
+}
+
+function addRow() {
+  const tbody = document.querySelector('#itemTable tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="center">#</td>
+    <td><input></td><td><input></td>
+    <td><input class="sl" type="number" value="0" oninput="updateTotals()"></td>
+    <td><input class="dg" type="number" value="0" oninput="updateTotals()"></td>
+    <td><input></td><td><input></td>
+    <td><input class="tt" type="number" value="0" readonly></td>
+    <td><input></td><td><input value="${currentHKD}"></td><td><input></td>
+    <td><button class="btn-small" onclick="this.closest('tr').remove(); updateTotals()">❌</button></td>`;
+  tbody.appendChild(tr);
+  updateTotals();
+}
+
+function updateTotals() {
+  let totalQty = 0, totalAmt = 0;
+  document.querySelectorAll('#itemTable tbody tr').forEach((row, i) => {
+    row.children[0].innerText = i + 1;
+    const sl = parseFloat(row.querySelector('.sl')?.value) || 0;
+    const dg = parseFloat(row.querySelector('.dg')?.value) || 0;
+    const tt = sl * dg;
+    row.querySelector('.tt').value = tt.toFixed(0);
+    totalQty += sl;
+    totalAmt += tt;
+  });
+  document.getElementById('totalQty').innerText = totalQty;
+  document.getElementById('totalAmt').innerText = totalAmt.toLocaleString();
+}
 
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
@@ -139,3 +253,6 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
   status.innerText = `✅ Đã xử lý ${blocks.length} hóa đơn / ${Object.keys(hkdData).length} HKD`;
 });
 </script>
+
+</body>
+</html>
