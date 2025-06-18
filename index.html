@@ -2,143 +2,52 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>PDF ➜ Văn bản + Bảng kê</title>
+  <title>Hiển thị toàn bộ nội dung PDF (có thể sửa)</title>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
   <style>
-    body { font-family: Arial; display: flex; gap: 20px; padding: 20px; }
-    #left, #right { flex: 1; }
+    body { font-family: Arial; padding: 20px; }
     textarea {
       width: 100%;
-      height: 600px;
+      height: 500px;
       font-family: monospace;
       white-space: pre-wrap;
       padding: 10px;
       border: 1px solid #ccc;
     }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-    th, td { border: 1px solid #ccc; padding: 4px; }
-    input { width: 100%; border: none; background: transparent; }
-    input:focus { background: #eef; outline: 1px solid #00f; }
   </style>
 </head>
 <body>
 
-<div id="left">
-  <h3>📄 Văn bản PDF</h3>
-  <input type="file" id="pdfInput" accept="application/pdf">
-  <div id="status">Chưa xử lý</div>
-  <textarea id="pdfTextArea" placeholder="Toàn bộ văn bản sẽ hiển thị ở đây..."></textarea>
-</div>
-
-<div id="right">
-  <h3>📊 Bảng kê hàng hóa (tự động tách)</h3>
-  <div id="tableOutput"></div>
-</div>
+<h3>📂 Chọn PDF để hiển thị nội dung chỉnh sửa được</h3>
+<input type="file" id="pdfInput" accept="application/pdf">
+<div id="status">Chưa xử lý</div>
+<textarea id="pdfTextArea" placeholder="Toàn bộ nội dung PDF sẽ hiển thị tại đây..."></textarea>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
 
-function groupLinesByY(items) {
-  const lines = {};
-  for (const item of items) {
-    const y = Math.round(item.transform[5]);
-    if (!lines[y]) lines[y] = [];
-    lines[y].push({ x: item.transform[4], str: item.str });
-  }
-  const sortedY = Object.keys(lines).sort((a, b) => b - a);
-  return sortedY.map(y =>
-    lines[y].sort((a, b) => a.x - b.x).map(t => t.str).join(' ')
-  );
-}
-
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+
   const status = document.getElementById('status');
   status.innerText = '📥 Đang xử lý PDF...';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let allLines = [];
+  let fullText = '';
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const rawLines = groupLinesByY(content.items);
-    const cleaned = rawLines.filter(l => !/^trang\s*\d+$/i.test(l.trim()));
-    allLines.push(...cleaned);
+    const pageText = content.items.map(item => item.str).join(' ');
+    fullText += `--- Trang ${i} ---\n` + pageText + '\n\n';
   }
 
-  document.getElementById('pdfTextArea').value = allLines.join('\n');
-  status.innerText = `✅ Đã xử lý ${pdf.numPages} trang`;
-
-  parseTableFromText(allLines);
+  document.getElementById('pdfTextArea').value = fullText;
+  status.innerText = `✅ Đã tải ${pdf.numPages} trang`;
 });
-
-// ⚙️ Phân tích bảng kê từ các dòng văn bản
-function parseTableFromText(lines) {
-  const products = [];
-  let block = [];
-
-  const isNumber = str => /^\d+([\.,]\d+)?$/.test(str.replace(/\./g, '').replace(',', '.'));
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    block.push(line);
-
-    // Kiểm tra dòng kết thúc: có đơn giá, thuế, thành tiền
-    const parts = line.split(/\s+/);
-    const last3 = parts.slice(-3);
-
-    if (last3.every(isNumber)) {
-      const merged = block.join(' ');
-      const match = merged.match(/^(.*?)\s+(Chai|Tui|Day|Hop|Tep|Kg|ml|l|lit|Túi|Dây)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)/i);
-
-      if (match) {
-        products.push({
-          ten: match[1].replace(/^(\d+)?\s*(Hàng)?/i, '').trim(),
-          dvt: match[2],
-          sl: match[3],
-          gia: match[4],
-          tt: match[5]
-        });
-      }
-      block = [];
-    }
-  }
-
-  // Hiển thị bảng HTML
-  let html = `<table><thead><tr>
-    <th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th>
-  </tr></thead><tbody>`;
-
-  let totalSL = 0, totalTT = 0;
-  products.forEach((p, i) => {
-    const sl = parseFloat(p.sl.replace(',', '.'));
-    const tt = parseFloat(p.tt.replace(',', '.'));
-    totalSL += sl;
-    totalTT += tt;
-
-    html += `<tr>
-      <td>${i + 1}</td>
-      <td><input value="${p.ten}"></td>
-      <td><input value="${p.dvt}"></td>
-      <td><input value="${p.sl}"></td>
-      <td><input value="${p.gia}"></td>
-      <td><input value="${p.tt}"></td>
-    </tr>`;
-  });
-
-  html += `<tr>
-    <td colspan="3"><b>Tổng</b></td>
-    <td><b>${totalSL}</b></td><td></td><td><b>${totalTT.toLocaleString()}</b></td>
-  </tr></tbody></table>`;
-
-  document.getElementById('tableOutput').innerHTML = html;
-}
 </script>
 </body>
 </html>
