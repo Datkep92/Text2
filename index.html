@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trích Xuất Hóa Đơn Đơn Giản</title>
+    <title>Trích Xuất Hóa Đơn Nâng Cao</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
     <style>
@@ -13,11 +13,8 @@
             line-height: 1.6;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
-        }
-        h1, h2 {
-            color: #2c3e50;
         }
         .section {
             margin-bottom: 20px;
@@ -65,84 +62,159 @@
             font-size: 14px;
             color: #666;
         }
+        .canvas-container {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+        #previewCanvas {
+            border: 1px solid #ccc;
+        }
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 10px 16px;
+            transition: 0.3s;
+            color: black;
+        }
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        .tab button.active {
+            background-color: #3498db;
+            color: white;
+        }
+        .tabcontent {
+            display: none;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Trích Xuất Hóa Đơn Đơn Giản</h1>
+        <h1>Trích Xuất Hóa Đơn Nâng Cao</h1>
         
         <div class="section">
-            <h2>Tải lên hóa đơn PDF</h2>
-            <input type="file" id="fileInput" accept=".pdf">
+            <h2>Tải lên hóa đơn</h2>
+            <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png">
             <div class="progress" id="progressContainer">
                 <progress id="progressBar" value="0" max="100"></progress>
                 <div class="status" id="status">Sẵn sàng</div>
             </div>
             <button id="extractBtn">Trích xuất dữ liệu</button>
+            <button id="enhanceBtn" disabled>Xử lý ảnh trước khi OCR</button>
         </div>
         
-        <div class="section">
-            <h2>Nội dung trích xuất</h2>
-            <textarea id="extractedText" readonly></textarea>
+        <div class="tab">
+            <button class="tablinks active" onclick="openTab(event, 'originalTab')">Ảnh gốc</button>
+            <button class="tablinks" onclick="openTab(event, 'processedTab')">Ảnh đã xử lý</button>
+            <button class="tablinks" onclick="openTab(event, 'resultTab')">Kết quả</button>
         </div>
         
-        <div class="section">
-            <h2>Bảng kê hàng hóa</h2>
-            <table id="itemsTable">
-                <thead>
-                    <tr>
-                        <th>STT</th>
-                        <th>Tên hàng hóa</th>
-                        <th>Đơn vị</th>
-                        <th>Số lượng</th>
-                        <th>Đơn giá</th>
-                        <th>Thành tiền</th>
-                    </tr>
-                </thead>
-                <tbody id="itemsTableBody">
-                    <!-- Dữ liệu hàng hóa sẽ được thêm vào đây -->
-                </tbody>
-            </table>
+        <div id="originalTab" class="tabcontent" style="display: block;">
+            <div class="canvas-container">
+                <canvas id="previewCanvas"></canvas>
+            </div>
         </div>
         
-        <div class="section">
-            <h2>Chiết khấu thương mại</h2>
-            <table id="discountsTable">
-                <thead>
-                    <tr>
-                        <th>Mô tả</th>
-                        <th>Giá trị</th>
-                    </tr>
-                </thead>
-                <tbody id="discountsTableBody">
-                    <!-- Dữ liệu chiết khấu sẽ được thêm vào đây -->
-                </tbody>
-            </table>
+        <div id="processedTab" class="tabcontent">
+            <div class="canvas-container">
+                <canvas id="processedCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div id="resultTab" class="tabcontent">
+            <div class="section">
+                <h2>Bảng kê hàng hóa</h2>
+                <table id="itemsTable">
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            <th>Tên hàng hóa</th>
+                            <th>Đơn vị</th>
+                            <th>Số lượng</th>
+                            <th>Đơn giá</th>
+                            <th>Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody"></tbody>
+                </table>
+            </div>
+            
+            <div class="section">
+                <h2>Chiết khấu thương mại</h2>
+                <table id="discountsTable">
+                    <thead>
+                        <tr>
+                            <th>Mô tả</th>
+                            <th>Giá trị</th>
+                        </tr>
+                    </thead>
+                    <tbody id="discountsTableBody"></tbody>
+                </table>
+            </div>
+            
+            <div class="section">
+                <h2>Dữ liệu thô</h2>
+                <textarea id="extractedText" readonly></textarea>
+            </div>
         </div>
     </div>
 
     <script>
-        // Khởi tạo PDF.js worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+        // Khởi tạo biến toàn cục
+        let currentPage = 0;
+        let pdfImages = [];
+        let processedImages = [];
         
         // DOM elements
         const fileInput = document.getElementById('fileInput');
         const extractBtn = document.getElementById('extractBtn');
+        const enhanceBtn = document.getElementById('enhanceBtn');
         const extractedText = document.getElementById('extractedText');
         const progressContainer = document.getElementById('progressContainer');
         const progressBar = document.getElementById('progressBar');
         const status = document.getElementById('status');
         const itemsTableBody = document.getElementById('itemsTableBody');
         const discountsTableBody = document.getElementById('discountsTableBody');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const processedCanvas = document.getElementById('processedCanvas');
         
-        // Xử lý khi nhấn nút trích xuất
-        extractBtn.addEventListener('click', processInvoice);
+        // Khởi tạo PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
         
-        // Xử lý hóa đơn PDF
-        async function processInvoice() {
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('Vui lòng chọn file PDF hóa đơn trước');
+        // Sự kiện khi chọn file
+        fileInput.addEventListener('change', async function(e) {
+            if (this.files && this.files[0]) {
+                const file = this.files[0];
+                if (file.type === 'application/pdf') {
+                    pdfImages = await pdfToImages(file);
+                    displayImage(pdfImages[0], previewCanvas);
+                } else {
+                    // Nếu là file ảnh
+                    const imgUrl = URL.createObjectURL(file);
+                    pdfImages = [imgUrl];
+                    displayImage(imgUrl, previewCanvas);
+                }
+                enhanceBtn.disabled = false;
+            }
+        });
+        
+        // Sự kiện khi nhấn nút trích xuất
+        extractBtn.addEventListener('click', async function() {
+            if (pdfImages.length === 0) {
+                alert('Vui lòng chọn file hóa đơn trước');
                 return;
             }
             
@@ -151,41 +223,87 @@
             progressBar.value = 0;
             
             try {
-                // Chuyển PDF thành hình ảnh
-                const images = await pdfToImages(file);
+                // Sử dụng ảnh đã xử lý nếu có, nếu không dùng ảnh gốc
+                const imagesToProcess = processedImages.length > 0 ? processedImages : pdfImages;
                 let fullText = '';
                 
-                // Xử lý từng trang với Tesseract
-                for (let i = 0; i < images.length; i++) {
-                    status.textContent = `Đang xử lý trang ${i + 1} của ${images.length}...`;
+                for (let i = 0; i < imagesToProcess.length; i++) {
+                    status.textContent = `Đang xử lý trang ${i + 1} của ${imagesToProcess.length}...`;
                     
                     const result = await Tesseract.recognize(
-                        images[i],
-                        'vie+eng', // Tiếng Việt và tiếng Anh
+                        imagesToProcess[i],
+                        'vie+eng',
                         {
                             logger: m => {
                                 if (m.status === 'recognizing text') {
                                     progressBar.value = m.progress * 100;
                                 }
-                            }
+                            },
+                            // Cấu hình Tesseract để tập trung vào bảng
+                            tessedit_pageseg_mode: 6 // Giả sử là một khối văn bản duy nhất
                         }
                     );
                     
                     fullText += result.data.text + '\n\n';
-                    progressBar.value = ((i + 1) / images.length) * 100;
+                    progressBar.value = ((i + 1) / imagesToProcess.length) * 100;
                 }
                 
                 extractedText.value = fullText;
-                
-                // Phân tích dữ liệu từ nội dung trích xuất
                 parseInvoiceTables(fullText);
-                
                 status.textContent = 'Hoàn thành!';
+                
+                // Hiển thị tab kết quả
+                document.querySelector('.tablinks.active').classList.remove('active');
+                document.querySelector('#resultTab').style.display = 'block';
+                document.querySelector('.tablinks[onclick="openTab(event, \'resultTab\')"]').classList.add('active');
             } catch (error) {
                 console.error('Lỗi khi xử lý hóa đơn:', error);
                 status.textContent = 'Lỗi: ' + error.message;
             }
-        }
+        });
+        
+        // Sự kiện khi nhấn nút xử lý ảnh
+        enhanceBtn.addEventListener('click', async function() {
+            if (pdfImages.length === 0) return;
+            
+            progressContainer.style.display = 'block';
+            status.textContent = 'Đang xử lý ảnh...';
+            progressBar.value = 0;
+            
+            try {
+                processedImages = [];
+                
+                for (let i = 0; i < pdfImages.length; i++) {
+                    status.textContent = `Đang xử lý ảnh trang ${i + 1} của ${pdfImages.length}...`;
+                    
+                    // Tạo canvas tạm để xử lý ảnh
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    
+                    // Tải ảnh vào canvas
+                    await loadImageToCanvas(pdfImages[i], tempCanvas);
+                    
+                    // Xử lý ảnh để cải thiện OCR
+                    enhanceImageForOCR(tempCanvas);
+                    
+                    // Lưu ảnh đã xử lý
+                    processedImages.push(tempCanvas.toDataURL('image/jpeg', 0.8));
+                    progressBar.value = ((i + 1) / pdfImages.length) * 100;
+                }
+                
+                // Hiển thị ảnh đã xử lý
+                displayImage(processedImages[0], processedCanvas);
+                status.textContent = 'Xử lý ảnh hoàn thành!';
+                
+                // Hiển thị tab ảnh đã xử lý
+                document.querySelector('.tablinks.active').classList.remove('active');
+                document.querySelector('#processedTab').style.display = 'block';
+                document.querySelector('.tablinks[onclick="openTab(event, \'processedTab\')"]').classList.add('active');
+            } catch (error) {
+                console.error('Lỗi khi xử lý ảnh:', error);
+                status.textContent = 'Lỗi xử lý ảnh: ' + error.message;
+            }
+        });
         
         // Chuyển PDF thành hình ảnh
         async function pdfToImages(file) {
@@ -225,99 +343,161 @@
             });
         }
         
-        // Phân tích bảng hàng hóa và chiết khấu từ nội dung
+        // Hiển thị ảnh lên canvas
+        function displayImage(imageSrc, canvas) {
+            const img = new Image();
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+            };
+            img.src = imageSrc;
+        }
+        
+        // Tải ảnh vào canvas
+        function loadImageToCanvas(imageSrc, canvas) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    resolve();
+                };
+                img.src = imageSrc;
+            });
+        }
+        
+        // Xử lý ảnh để cải thiện OCR
+        function enhanceImageForOCR(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            // Làm nét ảnh và tăng độ tương phản
+            for (let i = 0; i < data.length; i += 4) {
+                // Chuyển ảnh thành grayscale
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                
+                // Tăng độ tương phản
+                const contrast = 1.5;
+                const newValue = ((avg - 128) * contrast) + 128;
+                
+                // Áp dụng ngưỡng để làm rõ chữ
+                const threshold = newValue > 180 ? 255 : 0;
+                
+                data[i] = data[i + 1] = data[i + 2] = threshold;
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Thêm các bước xử lý khác nếu cần
+        }
+        
+        // Phân tích bảng từ nội dung OCR
         function parseInvoiceTables(text) {
-            // Xóa dữ liệu cũ
             itemsTableBody.innerHTML = '';
             discountsTableBody.innerHTML = '';
             
-            // Biểu thức chính quy để tìm hàng trong bảng
-            const rowRegex = /(\d+)\s*\|\s*([^|]+)\s*\|\s*([^|]*)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)\s*\|\s*([\d.,]+)%?\s*\|\s*([\d.,]+)/g;
+            // Tách nội dung thành các dòng
+            const lines = text.split('\n').filter(line => line.trim());
             
-            let match;
-            while ((match = rowRegex.exec(text)) !== null) {
-                const rowType = match[2].trim();
-                
-                if (rowType.includes('Hàng hóa') || rowType.includes('dịch vụ')) {
-                    // Đây là hàng hóa/dịch vụ
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${match[1]}</td>
-                        <td>${match[4].trim()}</td>
-                        <td>${match[5].trim()}</td>
-                        <td>${match[6].replace(/\./g, '').replace(',', '.')}</td>
-                        <td>${match[7].replace(/\./g, '').replace(',', '.')}</td>
-                        <td>${match[10].replace(/\./g, '').replace(',', '.')}</td>
-                    `;
-                    itemsTableBody.appendChild(row);
-                } else if (rowType.includes('Chiết khấu')) {
-                    // Đây là chiết khấu thương mại
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${match[4].trim()}</td>
-                        <td>${match[10].replace(/\./g, '').replace(',', '.')}</td>
-                    `;
-                    discountsTableBody.appendChild(row);
-                }
-            }
-            
-            // Nếu không tìm thấy bằng regex, thử cách khác
-            if (itemsTableBody.children.length === 0) {
-                extractTablesManually(text);
-            }
-        }
-        
-        // Phương pháp dự phòng để trích xuất bảng
-        function extractTablesManually(text) {
-            const lines = text.split('\n');
+            // Biến đánh dấu trạng thái
             let inItemsTable = false;
             let inDiscountsTable = false;
+            let headerPassed = false;
+            
+            // Biểu thức chính quy để nhận diện hàng trong bảng
+            const rowRegex = /(\d+)[\s|]*([^|]*)[\s|]*([^|]*)[\s|]*([^|]*)[\s|]*([^|]*)[\s|]*([\d.,]+)[\s|]*([\d.,]+)[\s|]*([\d.,]+)%?[\s|]*([\d.,]+)/;
             
             for (const line of lines) {
                 // Phát hiện bắt đầu bảng hàng hóa
-                if (line.includes('Tên hàng hóa, dịch vụ') || line.includes('Đơn vị tính')) {
+                if (line.includes('Tên hàng hóa') || line.includes('Đơn vị tính')) {
                     inItemsTable = true;
                     inDiscountsTable = false;
+                    headerPassed = false;
                     continue;
                 }
                 
                 // Phát hiện bắt đầu bảng chiết khấu
-                if (line.includes('Chiết khấu thương mại')) {
+                if (line.includes('Chiết khấu')) {
                     inItemsTable = false;
                     inDiscountsTable = true;
+                    headerPassed = false;
+                    continue;
+                }
+                
+                // Bỏ qua dòng tiêu đề
+                if (line.includes('---') || line.includes('STT') || line.includes('Tính chất')) {
+                    headerPassed = true;
                     continue;
                 }
                 
                 // Xử lý hàng hóa
-                if (inItemsTable && line.trim() && !line.includes('---')) {
-                    const columns = line.split('|').map(col => col.trim()).filter(col => col);
-                    if (columns.length >= 6) {
+                if (inItemsTable && headerPassed) {
+                    const match = line.match(rowRegex);
+                    if (match && match.length >= 10) {
                         const row = document.createElement('tr');
                         row.innerHTML = `
-                            <td>${columns[0] || ''}</td>
-                            <td>${columns[3] || ''}</td>
-                            <td>${columns[4] || ''}</td>
-                            <td>${columns[5] ? columns[5].replace(/\./g, '').replace(',', '.') : ''}</td>
-                            <td>${columns[6] ? columns[6].replace(/\./g, '').replace(',', '.') : ''}</td>
-                            <td>${columns[9] ? columns[9].replace(/\./g, '').replace(',', '.') : ''}</td>
+                            <td>${match[1] || ''}</td>
+                            <td>${match[4]?.trim() || ''}</td>
+                            <td>${match[5]?.trim() || ''}</td>
+                            <td>${match[6] ? match[6].replace(/\./g, '').replace(',', '.') : ''}</td>
+                            <td>${match[7] ? match[7].replace(/\./g, '').replace(',', '.') : ''}</td>
+                            <td>${match[9] ? match[9].replace(/\./g, '').replace(',', '.') : ''}</td>
                         `;
                         itemsTableBody.appendChild(row);
+                    } else {
+                        // Thử cách khác nếu regex không khớp
+                        const columns = line.split(/\s{2,}/).filter(col => col.trim());
+                        if (columns.length >= 6) {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${columns[0] || ''}</td>
+                                <td>${columns[3] || ''}</td>
+                                <td>${columns[4] || ''}</td>
+                                <td>${columns[5] ? columns[5].replace(/\./g, '').replace(',', '.') : ''}</td>
+                                <td>${columns[6] ? columns[6].replace(/\./g, '').replace(',', '.') : ''}</td>
+                                <td>${columns[8] ? columns[8].replace(/\./g, '').replace(',', '.') : ''}</td>
+                            `;
+                            itemsTableBody.appendChild(row);
+                        }
                     }
                 }
                 
                 // Xử lý chiết khấu
-                if (inDiscountsTable && line.trim() && !line.includes('---')) {
-                    const columns = line.split('|').map(col => col.trim()).filter(col => col);
-                    if (columns.length >= 2) {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${columns[3] || ''}</td>
-                            <td>${columns[9] ? columns[9].replace(/\./g, '').replace(',', '.') : ''}</td>
-                        `;
-                        discountsTableBody.appendChild(row);
+                if (inDiscountsTable && headerPassed) {
+                    if (line.includes('Chiết khấu')) {
+                        const columns = line.split(/\s{2,}/).filter(col => col.trim());
+                        if (columns.length >= 2) {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${columns.slice(3, -1).join(' ') || ''}</td>
+                                <td>${columns[columns.length - 1]?.replace(/\./g, '').replace(',', '.') || ''}</td>
+                            `;
+                            discountsTableBody.appendChild(row);
+                        }
                     }
                 }
             }
+        }
+        
+        // Chuyển đổi giữa các tab
+        function openTab(evt, tabName) {
+            const tabcontent = document.getElementsByClassName("tabcontent");
+            for (let i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            
+            const tablinks = document.getElementsByClassName("tablinks");
+            for (let i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
         }
     </script>
 </body>
