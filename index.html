@@ -2,26 +2,26 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>📄 PDF ➜ Bảng Excel chỉnh sửa trực tiếp</title>
+  <title>Hiển thị toàn bộ nội dung PDF (có thể sửa)</title>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
-    body { font-family: Arial; margin: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 4px; }
-    input { width: 100%; border: none; background: transparent; }
-    input:focus { outline: 1px solid #00f; background: #e6f0ff; }
-    button { margin: 10px 5px 0 0; }
+    body { font-family: Arial; padding: 20px; }
+    textarea {
+      width: 100%;
+      height: 500px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      padding: 10px;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
 
-<h3>📂 Chọn file PDF để hiển thị bảng như Excel</h3>
+<h3>📂 Chọn PDF để hiển thị nội dung chỉnh sửa được</h3>
 <input type="file" id="pdfInput" accept="application/pdf">
-<button onclick="exportExcel()">⬇️ Xuất Excel</button>
-<button onclick="addRow()">➕ Thêm dòng</button>
 <div id="status">Chưa xử lý</div>
-<div id="tableContainer"></div>
+<textarea id="pdfTextArea" placeholder="Toàn bộ nội dung PDF sẽ hiển thị tại đây..."></textarea>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -36,91 +36,18 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let textContent = [];
+  let fullText = '';
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageText = content.items.map(item => item.str).join('\n');
-    textContent.push(pageText);
+    const pageText = content.items.map(item => item.str).join(' ');
+    fullText += `--- Trang ${i} ---\n` + pageText + '\n\n';
   }
 
-  const allText = textContent.join('\n');
-  const lines = allText.split('\n').map(l => l.trim()).filter(l => l);
-
-  // Nhận dạng dòng bảng kê bằng cách có nhiều khoảng trắng
-  const tableLines = lines.filter(l => (l.match(/\s{2,}/g) || []).length > 2);
-  const tableData = tableLines.map(line =>
-    line.replace(/\s{2,}/g, '|').split('|').map(cell => cell.trim())
-  );
-
-  displayTable(tableData);
-  status.innerText = `✅ Đã đọc ${tableData.length} dòng bảng`;
+  document.getElementById('pdfTextArea').value = fullText;
+  status.innerText = `✅ Đã tải ${pdf.numPages} trang`;
 });
-
-function displayTable(data) {
-  const container = document.getElementById('tableContainer');
-  if (data.length === 0) return container.innerHTML = '<i>Không tìm thấy bảng</i>';
-
-  let html = '<table id="editableTable"><thead><tr>';
-  const cols = data[0].length;
-  for (let i = 0; i < cols; i++) html += `<th>Cột ${i+1}</th>`;
-  html += '</tr></thead><tbody>';
-
-  data.forEach(row => {
-    html += '<tr>' + row.map(cell =>
-      `<td><input value="${cell}" oninput="updateTotals()"></td>`
-    ).join('') + '</tr>';
-  });
-
-  html += `<tr><td colspan="${cols - 2}"><b>Tổng</b></td>
-            <td id="totalSL"></td><td id="totalTT"></td></tr>`;
-  html += '</tbody></table>';
-  container.innerHTML = html;
-  updateTotals();
-}
-
-function addRow() {
-  const table = document.getElementById('editableTable').getElementsByTagName('tbody')[0];
-  const cols = table.rows[0].cells.length;
-  const tr = document.createElement('tr');
-  for (let i = 0; i < cols; i++) {
-    const td = document.createElement('td');
-    const input = document.createElement('input');
-    input.oninput = updateTotals;
-    td.appendChild(input);
-    tr.appendChild(td);
-  }
-  table.insertBefore(tr, table.lastElementChild); // chèn trước dòng tổng
-}
-
-function updateTotals() {
-  let totalSL = 0, totalTT = 0;
-  const table = document.getElementById('editableTable');
-  if (!table) return;
-
-  const rows = table.getElementsByTagName('tbody')[0].rows;
-  for (let i = 0; i < rows.length - 1; i++) {
-    const cells = rows[i].querySelectorAll('input');
-    const sl = parseFloat(cells[cells.length - 2]?.value.replace(/,/g, '')) || 0;
-    const tt = parseFloat(cells[cells.length - 1]?.value.replace(/,/g, '')) || 0;
-    totalSL += sl;
-    totalTT += tt;
-  }
-
-  document.getElementById('totalSL').innerText = totalSL;
-  document.getElementById('totalTT').innerText = totalTT.toLocaleString();
-}
-
-function exportExcel() {
-  const table = document.getElementById('editableTable');
-  if (!table) return;
-
-  const ws = XLSX.utils.table_to_sheet(table);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'BangKe');
-  XLSX.writeFile(wb, 'BangKe.xlsx');
-}
 </script>
 </body>
 </html>
