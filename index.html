@@ -2,61 +2,61 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Hiển thị nội dung PDF có thể sửa (xuống dòng chính xác)</title>
+  <title>PDF ➜ Bảng kê hàng hóa</title>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
   <style>
     body { font-family: Arial; padding: 20px; }
     textarea {
-      width: 100%;
-      height: 600px;
-      font-family: monospace;
-      white-space: pre-wrap;
-      padding: 10px;
-      border: 1px solid #ccc;
-      background: #fff;
+      width: 100%; height: 300px;
+      font-family: monospace; white-space: pre-wrap;
+      margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;
     }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { border: 1px solid #ccc; padding: 4px; }
+    input { width: 100%; border: none; background: transparent; }
+    input:focus { background: #eef; outline: 1px solid #00f; }
+    button { margin-top: 10px; }
   </style>
 </head>
 <body>
 
-<h3>📂 Chọn file PDF ➜ Hiển thị văn bản có thể sửa (tách dòng đúng)</h3>
+<h3>📂 Chọn PDF ➜ Hiển thị văn bản & bảng kê</h3>
 <input type="file" id="pdfInput" accept="application/pdf">
 <div id="status">Chưa xử lý</div>
+
+<h4>📄 Văn bản từ PDF</h4>
 <textarea id="pdfTextArea" placeholder="Toàn bộ văn bản sẽ hiển thị ở đây..."></textarea>
+
+<h4>📊 Bảng kê hàng hóa</h4>
+<div id="tableContainer"></div>
+<button onclick="addRow()">➕ Thêm dòng</button>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
 
-function removeVietnamese(str) {
+function removeVN(str) {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            .replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 }
 
-// Gom chữ theo dòng ngang (dựa theo Y)
-function groupByLine(items) {
+function groupLinesByY(items) {
   const lines = {};
   for (const item of items) {
-    const y = Math.round(item.transform[5]); // Y là chiều cao (dòng)
-    const x = item.transform[4]; // X là vị trí ngang
-
+    const y = Math.round(item.transform[5]);
+    const x = item.transform[4];
     if (!lines[y]) lines[y] = [];
     lines[y].push({ x, str: item.str });
   }
-
   const sortedY = Object.keys(lines).sort((a, b) => b - a);
-  return sortedY.map(y => {
-    return lines[y]
-      .sort((a, b) => a.x - b.x)
-      .map(t => t.str)
-      .join(' ');
-  });
+  return sortedY.map(y =>
+    lines[y].sort((a, b) => a.x - b.x).map(t => t.str).join(' ')
+  );
 }
 
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-
   const status = document.getElementById('status');
   status.innerText = '📥 Đang xử lý...';
 
@@ -67,27 +67,103 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const rawLines = groupByLine(content.items);
-
-    // Bỏ dòng kiểu "Trang 1", "Trang 2"
-    const cleaned = rawLines.filter(line => !/^trang\s*\d+$/i.test(removeVietnamese(line.trim())));
-
+    const lines = groupLinesByY(content.items);
+    const cleaned = lines.filter(line => !/^trang\s*\d+$/i.test(removeVN(line)));
     allLines.push(...cleaned);
   }
 
-  // Tách dòng khi gặp từ khoá "hàng hóa" hoặc "chiết khấu"
-  let finalLines = [];
-  for (let line of allLines) {
-    const noAccent = removeVietnamese(line);
+  document.getElementById('pdfTextArea').value = allLines.join('\n');
+
+  const blocks = [];
+  let buffer = [];
+
+  for (const line of allLines) {
+    const noAccent = removeVN(line);
     if (/hang hoa|chiet khau/.test(noAccent)) {
-      finalLines.push(''); // xuống dòng trước
+      if (buffer.length) blocks.push(buffer);
+      buffer = [line];
+    } else {
+      buffer.push(line);
     }
-    finalLines.push(line);
+  }
+  if (buffer.length) blocks.push(buffer);
+
+  const rows = [];
+  for (const block of blocks) {
+    const text = block.join(' ');
+    const parts = text.match(/^(.*?)\s+(Chai|Tui|Day|Hop|Tep|Kg|ml|l|lit|Túi|Dây)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)$/i);
+    if (parts) {
+      rows.push({
+        ten: parts[1].replace(/^(\d+)?\s*(Hàng)?/i, '').trim(),
+        dvt: parts[2],
+        sl: parts[3],
+        gia: parts[4],
+        tt: parts[5]
+      });
+    }
   }
 
-  document.getElementById('pdfTextArea').value = finalLines.join('\n');
-  status.innerText = `✅ Xong: ${pdf.numPages} trang`;
+  renderTable(rows);
+  status.innerText = `✅ Đã nhận ${rows.length} dòng hàng hóa`;
 });
+
+function renderTable(data) {
+  let html = `<table id="bangKe"><thead>
+    <tr><th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th></tr>
+  </thead><tbody>`;
+
+  data.forEach((p, i) => {
+    html += `<tr>
+      <td>${i+1}</td>
+      <td><input value="${p.ten}"></td>
+      <td><input value="${p.dvt}"></td>
+      <td><input class="sl" value="${p.sl}" oninput="updateTotal()"></td>
+      <td><input class="dg" value="${p.gia}" oninput="updateTotal()"></td>
+      <td><input class="tt" value="${p.tt}" readonly></td>
+    </tr>`;
+  });
+
+  html += `<tr>
+    <td colspan="3"><b>Tổng</b></td>
+    <td id="tongSL"></td><td></td><td id="tongTT"></td>
+  </tr></tbody></table>`;
+
+  document.getElementById('tableContainer').innerHTML = html;
+  updateTotal();
+}
+
+function updateTotal() {
+  const rows = document.querySelectorAll('#bangKe tbody tr');
+  let totalSL = 0, totalTT = 0;
+
+  rows.forEach((row, i) => {
+    const sl = parseFloat(row.querySelector('.sl')?.value.replace(',', '.')) || 0;
+    const dg = parseFloat(row.querySelector('.dg')?.value.replace(',', '.')) || 0;
+    const tt = sl * dg;
+    const ttCell = row.querySelector('.tt');
+    if (ttCell) ttCell.value = tt.toFixed(0);
+    totalSL += sl;
+    totalTT += tt;
+  });
+
+  document.getElementById('tongSL').innerText = totalSL;
+  document.getElementById('tongTT').innerText = totalTT.toLocaleString();
+}
+
+function addRow() {
+  const table = document.querySelector('#bangKe tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>#</td>
+    <td><input></td>
+    <td><input></td>
+    <td><input class="sl" value="0" oninput="updateTotal()"></td>
+    <td><input class="dg" value="0" oninput="updateTotal()"></td>
+    <td><input class="tt" readonly></td>
+  `;
+  table.insertBefore(tr, table.lastElementChild);
+  updateTotal();
+}
 </script>
 </body>
 </html>
