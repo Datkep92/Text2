@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Hiển thị nội dung PDF (chỉnh sửa được)</title>
+  <title>Hiển thị nội dung PDF có thể sửa (xuống dòng chính xác)</title>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
   <style>
     body { font-family: Arial; padding: 20px; }
@@ -19,10 +19,10 @@
 </head>
 <body>
 
-<h3>📂 Chọn file PDF để hiển thị nội dung (có thể sửa)</h3>
+<h3>📂 Chọn file PDF ➜ Hiển thị văn bản có thể sửa (tách dòng đúng)</h3>
 <input type="file" id="pdfInput" accept="application/pdf">
 <div id="status">Chưa xử lý</div>
-<textarea id="pdfTextArea" placeholder="Toàn bộ nội dung PDF sẽ hiển thị ở đây..."></textarea>
+<textarea id="pdfTextArea" placeholder="Toàn bộ văn bản sẽ hiển thị ở đây..."></textarea>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -33,41 +33,60 @@ function removeVietnamese(str) {
             .replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
 }
 
+// Gom chữ theo dòng ngang (dựa theo Y)
+function groupByLine(items) {
+  const lines = {};
+  for (const item of items) {
+    const y = Math.round(item.transform[5]); // Y là chiều cao (dòng)
+    const x = item.transform[4]; // X là vị trí ngang
+
+    if (!lines[y]) lines[y] = [];
+    lines[y].push({ x, str: item.str });
+  }
+
+  const sortedY = Object.keys(lines).sort((a, b) => b - a);
+  return sortedY.map(y => {
+    return lines[y]
+      .sort((a, b) => a.x - b.x)
+      .map(t => t.str)
+      .join(' ');
+  });
+}
+
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
   const status = document.getElementById('status');
-  status.innerText = '📥 Đang xử lý PDF...';
+  status.innerText = '📥 Đang xử lý...';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let resultLines = [];
+  let allLines = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
+    const rawLines = groupByLine(content.items);
 
-    let currentLine = '';
-    for (const item of content.items) {
-      const text = item.str.trim();
-      const noAccent = removeVietnamese(text);
+    // Bỏ dòng kiểu "Trang 1", "Trang 2"
+    const cleaned = rawLines.filter(line => !/^trang\s*\d+$/i.test(removeVietnamese(line.trim())));
 
-      if (/^trang\s*\d+$/i.test(noAccent)) continue;
-
-      if (/hang hoa|chiet khau/i.test(noAccent)) {
-        if (currentLine) resultLines.push(currentLine.trim());
-        currentLine = text;
-      } else {
-        currentLine += ' ' + text;
-      }
-    }
-
-    if (currentLine) resultLines.push(currentLine.trim());
+    allLines.push(...cleaned);
   }
 
-  document.getElementById('pdfTextArea').value = resultLines.join('\n');
-  status.innerText = `✅ Đã xử lý ${pdf.numPages} trang`;
+  // Tách dòng khi gặp từ khoá "hàng hóa" hoặc "chiết khấu"
+  let finalLines = [];
+  for (let line of allLines) {
+    const noAccent = removeVietnamese(line);
+    if (/hang hoa|chiet khau/.test(noAccent)) {
+      finalLines.push(''); // xuống dòng trước
+    }
+    finalLines.push(line);
+  }
+
+  document.getElementById('pdfTextArea').value = finalLines.join('\n');
+  status.innerText = `✅ Xong: ${pdf.numPages} trang`;
 });
 </script>
 </body>
