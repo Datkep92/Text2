@@ -1,139 +1,238 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>Trích xuất hóa đơn PDF - Quản lý Hộ KD</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Quản lý hóa đơn - Theo HKD</title>
   <style>
-    body { margin: 0; font-family: Arial; display: flex; height: 100vh; }
-    .sidebar { width: 250px; padding: 15px; background: #f0f0f0; overflow-y: auto; }
-    .main { flex: 1; padding: 20px; overflow-y: auto; }
-    button, input[type=file] { margin: 8px 0; padding: 8px; font-size: 14px; }
-    ul { list-style: none; padding: 0; }
-    li { padding: 6px; background: #fff; border: 1px solid #ccc; margin-bottom: 4px; cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-    .total { margin-top: 10px; font-weight: bold; }
+    body { font-family: Arial; display: flex; padding: 20px; gap: 20px; }
+    #left { width: 200px; }
+    #left ul { list-style: none; padding: 0; }
+    #left li { cursor: pointer; margin: 5px 0; color: blue; text-decoration: underline; }
+    #right { flex: 1; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 5px; font-size: 13px; }
+    input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
+    .center { text-align: center; }
+    .btn-small { font-size: 11px; padding: 2px 5px; }
   </style>
 </head>
 <body>
 
-  <div class="sidebar">
-    <h3>📂 Danh sách Hộ KD</h3>
-    <ul id="hkdList"></ul>
-  </div>
+<div id="left">
+  <h4>📋 Danh sách HKD</h4>
+  <ul id="hkdList"></ul>
+</div>
 
-  <div class="main">
-    <h2>📥 Tải hóa đơn PDF</h2>
-    <input type="file" id="pdfFile" accept="application/pdf" />
-    <button onclick="xuLyPDF()">Xử lý hóa đơn</button>
+<div id="right">
+  <h3>📄 Bảng kê hàng hóa</h3>
+  <input type="file" id="pdfInput" accept="application/pdf"><br>
+  <div id="status">Chưa xử lý</div>
+  <div id="output"></div>
+</div>
 
-    <div id="thongTinHKD"></div>
-    <div id="bangHang"></div>
-  </div>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
 
-  <script>
-    let ds = JSON.parse(localStorage.getItem('DS_HKD') || '[]');
-    let curHKD = null;
+const hkdData = {};
+let currentHKD = '';
 
-    function saveDS() {
-      localStorage.setItem('DS_HKD', JSON.stringify(ds));
+function removeVN(str) {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+}
+
+function groupTextByY(items) {
+  const lines = {};
+  for (const item of items) {
+    const y = Math.round(item.transform[5]);
+    const x = item.transform[4];
+    if (!lines[y]) lines[y] = [];
+    lines[y].push({ x, str: item.str });
+  }
+
+  const sortedY = Object.keys(lines).sort((a, b) => b - a);
+  return sortedY.map(y => lines[y].sort((a, b) => a.x - b.x).map(t => t.str).join(' '));
+}
+
+function parseInvoiceBlocks(lines) {
+  const blocks = [];
+  let block = [];
+
+  for (const line of lines) {
+    if (/^mau so|^ky hieu|^so:|^hoa don gia tri/i.test(line) && block.length) {
+      blocks.push(block);
+      block = [];
     }
+    block.push(line);
+  }
+  if (block.length) blocks.push(block);
+  return blocks;
+}
 
-    function renderDanhSach() {
-      const ul = document.getElementById('hkdList');
-      ul.innerHTML = '';
-      ds.forEach(h => {
-        const li = document.createElement('li');
-        li.textContent = h.ten;
-        li.onclick = () => {
-          curHKD = h;
-          renderChiTiet();
-        };
-        ul.appendChild(li);
-      });
-    }
+function extractDataFromBlock(block) {
+  const HKD = block.find(l => /ten nguoi mua|ho ten nguoi mua/i.test(removeVN(l))) || 'HKD không rõ';
+  const NPP = block.find(l => /ten nguoi ban/i.test(removeVN(l))) || 'NPP không rõ';
 
-    function renderChiTiet() {
-      if (!curHKD) return;
-      document.getElementById('thongTinHKD').innerHTML = `<h3>📌 ${curHKD.ten}</h3>`;
-      let html = `<table>
-        <tr><th>Tên hàng</th><th>ĐVT</th><th>SL</th><th>Đơn giá</th><th>Nhà phân phối</th><th>Tổng tiền</th></tr>`;
-      let tongSL = 0, tongTien = 0;
-      curHKD.hang.forEach(h => {
-        const tt = h.sl * h.gia;
-        tongSL += h.sl;
-        tongTien += tt;
-        html += `<tr>
-          <td>${h.ten}</td>
-          <td>${h.dvt || ''}</td>
-          <td>${h.sl}</td>
-          <td>${h.gia.toLocaleString()}</td>
-          <td>${h.npp}</td>
-          <td>${tt.toLocaleString()}</td>
-        </tr>`;
-      });
-      html += `</table>`;
-      html += `<div class="total">Tổng SL: ${tongSL} | Tổng tiền: ${tongTien.toLocaleString()} đ</div>`;
-      document.getElementById('bangHang').innerHTML = html;
-    }
+  const data = [];
+  const start = block.findIndex(l => /hang hoa, dich vu/i.test(removeVN(l)));
+  if (start === -1) return { HKD, NPP, data };
 
-    async function xuLyPDF() {
-      const file = document.getElementById('pdfFile').files[0];
-      if (!file) return alert('Chọn file PDF!');
-      const buffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        fullText += content.items.map(i => i.str).join(' ') + '\\n';
-      }
-      processPDFContent(fullText);
-    }
+  for (let i = start + 1; i < block.length; i++) {
+    const line = block[i];
+    if (/^tong|^thue|^tong tien|^chu ky/i.test(removeVN(line))) break;
 
-    function processPDFContent(text) {
-      const tenHKD = (text.match(/Tên người mua\\s*[:\\-]?\\s*(.+)/i) || [])[1]?.trim() || 'Chưa rõ';
-      const tenNPP = (text.match(/Tên người bán\\s*[:\\-]?\\s*(.+)/i) || [])[1]?.trim() || 'Không rõ';
+    const parts = line.trim().split(/\s+/);
+    if (parts.length < 6) continue;
 
-      if (!tenHKD) return alert("Không tìm thấy người mua!");
-      let hkd = ds.find(h => h.ten === tenHKD);
-      if (!hkd) {
-        hkd = { ten: tenHKD, hang: [] };
-        ds.push(hkd);
-      }
+    const last = parts.slice(-6);
+    let name = parts.slice(0, parts.length - 6).join(' ');
+    name = name.replace(/^\d+\s*/g, '').replace(/^hang\s*/i, '');
 
-      curHKD = hkd;
+    const sl = Number(last[1].replace(',', '.'));
+    if (!Number.isFinite(sl) || sl === 0) continue;
 
-      const lines = text.split('\\n');
-      const regexSP = /(.+?)\\s+(Thùng|Chai|Gói|Túi|Hộp|Kg|Tấm)\\s+(\\d+)\\s+([\\d.,]+)\\s+\\d+%\\s+([\\d.,]+)/i;
+    data.push({
+      ten: name,
+      dvt: last[0],
+      sl: sl,
+      gia: parseFloat(last[2].replace(',', '.')),
+      ck: parseFloat(last[3].replace(',', '.')),
+      thue: last[4],
+      tt: parseFloat(last[5].replace(',', '.')),
+      loai: 'Hàng hóa',
+      hkd: HKD.replace(/(ten nguoi mua|ho ten nguoi mua hang):?/i, '').trim(),
+      npp: NPP.replace(/ten nguoi ban:?/i, '').trim()
+    });
+  }
 
-      lines.forEach(line => {
-        const m = line.match(regexSP);
-        if (m) {
-          const ten = m[1].trim();
-          const dvt = m[2];
-          const sl = parseInt(m[3]);
-          const gia = parseFloat(m[4].replace(/[.,]/g, ''));
-          const thanhtien = parseFloat(m[5].replace(/[.,]/g, ''));
+  return {
+    HKD: HKD.replace(/(ten nguoi mua|ho ten nguoi mua hang):?/i, '').trim(),
+    NPP: NPP.replace(/ten nguoi ban:?/i, '').trim(),
+    data
+  };
+}
 
-          const sp = hkd.hang.find(h => h.ten === ten && h.npp === tenNPP);
-          if (sp) {
-            sp.sl += sl;
-            sp.thanhtien += thanhtien;
-          } else {
-            hkd.hang.push({ ten, dvt, sl, gia, npp: tenNPP, thanhtien });
-          }
-        }
-      });
+function displayHKDList() {
+  const list = document.getElementById('hkdList');
+  list.innerHTML = '';
+  Object.keys(hkdData).forEach(hkd => {
+    const li = document.createElement('li');
+    li.textContent = hkd;
+    li.onclick = () => showTableFor(hkd);
+    list.appendChild(li);
+  });
+}
 
-      saveDS();
-      renderDanhSach();
-      renderChiTiet();
-      alert(`✅ Đã xử lý cho Hộ KD: ${tenHKD}`);
-    }
+function showTableFor(hkd) {
+  currentHKD = hkd;
+  const items = hkdData[hkd];
+  const output = document.getElementById('output');
+  if (!items || items.length === 0) {
+    output.innerHTML = '<i>Không có dữ liệu</i>';
+    return;
+  }
 
-    renderDanhSach();
-  </script>
+  let html = `<button onclick="addRow()">➕ Thêm hàng thủ công</button>
+  <table id="itemTable"><thead><tr>
+    <th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th>
+    <th>Đơn giá</th><th>Chiết khấu</th><th>Thuế</th><th>Thành tiền</th>
+    <th>Loại</th><th>HKD</th><th>NPP</th><th></th>
+  </tr></thead><tbody>`;
+
+  items.forEach((p, i) => {
+    html += `<tr>
+      <td class="center">${i + 1}</td>
+      <td><input value="${p.ten}"></td>
+      <td><input value="${p.dvt}"></td>
+      <td><input class="sl" type="number" value="${p.sl}" oninput="updateTotals()"></td>
+      <td><input class="dg" type="number" value="${p.gia}" oninput="updateTotals()"></td>
+      <td><input value="${p.ck}"></td>
+      <td><input value="${p.thue}"></td>
+      <td><input class="tt" type="number" value="${p.tt}" readonly></td>
+      <td><input value="${p.loai}"></td>
+      <td><input value="${p.hkd}"></td>
+      <td><input value="${p.npp}"></td>
+      <td><button class="btn-small" onclick="this.closest('tr').remove(); updateTotals()">❌</button></td>
+    </tr>`;
+  });
+
+  html += `</tbody>
+    <tfoot><tr>
+      <td colspan="3"><b>Tổng</b></td>
+      <td id="totalQty" class="center">0</td>
+      <td colspan="3"></td>
+      <td id="totalAmt" class="center">0</td>
+      <td colspan="4"></td>
+    </tr></tfoot>
+  </table>`;
+  output.innerHTML = html;
+  updateTotals();
+}
+
+function addRow() {
+  const tbody = document.querySelector('#itemTable tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="center">#</td>
+    <td><input></td><td><input></td>
+    <td><input class="sl" type="number" value="0" oninput="updateTotals()"></td>
+    <td><input class="dg" type="number" value="0" oninput="updateTotals()"></td>
+    <td><input></td><td><input></td>
+    <td><input class="tt" type="number" value="0" readonly></td>
+    <td><input></td><td><input value="${currentHKD}"></td><td><input></td>
+    <td><button class="btn-small" onclick="this.closest('tr').remove(); updateTotals()">❌</button></td>`;
+  tbody.appendChild(tr);
+  updateTotals();
+}
+
+function updateTotals() {
+  let totalQty = 0, totalAmt = 0;
+  document.querySelectorAll('#itemTable tbody tr').forEach((row, i) => {
+    row.children[0].innerText = i + 1;
+    const sl = parseFloat(row.querySelector('.sl')?.value) || 0;
+    const dg = parseFloat(row.querySelector('.dg')?.value) || 0;
+    const tt = sl * dg;
+    row.querySelector('.tt').value = tt.toFixed(0);
+    totalQty += sl;
+    totalAmt += tt;
+  });
+  document.getElementById('totalQty').innerText = totalQty;
+  document.getElementById('totalAmt').innerText = totalAmt.toLocaleString();
+}
+
+document.getElementById('pdfInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const status = document.getElementById('status');
+  status.innerText = '📥 Đang xử lý...';
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  let allLines = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const lines = groupTextByY(content.items);
+    allLines.push(...lines);
+  }
+
+  const blocks = parseInvoiceBlocks(allLines);
+
+  for (const block of blocks) {
+    const parsed = extractDataFromBlock(block);
+    if (!parsed.HKD || parsed.data.length === 0) continue;
+    if (!hkdData[parsed.HKD]) hkdData[parsed.HKD] = [];
+    hkdData[parsed.HKD].push(...parsed.data);
+  }
+
+  displayHKDList();
+  status.innerText = `✅ Đã xử lý ${blocks.length} hóa đơn / ${Object.keys(hkdData).length} HKD`;
+});
+</script>
+
 </body>
 </html>
