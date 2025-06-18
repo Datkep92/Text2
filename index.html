@@ -2,45 +2,40 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Trích hóa đơn ➜ Phân HKD & NPP</title>
+  <title>Trích xuất bảng kê hoá đơn PDF - Chọn thủ công</title>
   <style>
-    body { font-family: Arial; display: flex; padding: 20px; gap: 20px; }
-    #left { width: 220px; }
-    #left ul { list-style: none; padding: 0; }
-    #left li { cursor: pointer; margin: 5px 0; color: blue; text-decoration: underline; }
-    #right { flex: 1; }
+    body { font-family: Arial; margin: 20px; }
+    textarea, pre { width: 100%; height: 200px; font-family: monospace; }
+    .highlight { background-color: #dff0d8; }
+    .clickable { cursor: pointer; }
     table { border-collapse: collapse; width: 100%; margin-top: 10px; }
     th, td { border: 1px solid #ccc; padding: 5px; font-size: 13px; }
-    input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
-    .center { text-align: center; }
+    input { width: 100%; }
     .btn-small { font-size: 11px; padding: 2px 5px; }
   </style>
 </head>
 <body>
 
-<div id="left">
-  <h4>📋 Danh sách HKD</h4>
-  <ul id="hkdList"></ul>
-</div>
+<h3>📄 B1: Tải file PDF → Hiển thị toàn bộ nội dung</h3>
+<input type="file" id="pdfInput" accept="application/pdf">
+<p><b>🖱️ Click dòng bắt đầu và kết thúc bảng kê để chọn vùng cần phân tích.</b></p>
+<pre id="textLines"></pre>
 
-<div id="right">
-  <h3>📄 Bảng kê hàng hóa</h3>
-  <input type="file" id="pdfInput" accept="application/pdf"><br>
-  <div id="status">Chưa xử lý</div>
-  <div id="output"></div>
-</div>
+<h3>📊 B2: Kết quả bảng kê</h3>
+<div id="result"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
 
-const hkdData = {};
-let currentHKD = '';
+let allLines = [];
+let selectedStart = null;
+let selectedEnd = null;
 
 function removeVN(str) {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+    .replace(/đ/g, "d").replace(/Đ/g, "D");
 }
 
 function groupTextByY(items) {
@@ -53,113 +48,116 @@ function groupTextByY(items) {
   }
 
   const sortedY = Object.keys(lines).sort((a, b) => b - a);
-  return sortedY.map(y => lines[y].sort((a, b) => a.x - b.x).map(t => t.str).join(' '));
+  return sortedY.map((y) =>
+    lines[y].sort((a, b) => a.x - b.x).map((t) => t.str).join(' ')
+  );
 }
 
-function parseInvoiceBlocks(lines) {
-  const blocks = [];
-  let block = [];
-  for (const line of lines) {
-    if (/^mau so|^ky hieu|^so:|^hoa don gia tri/i.test(removeVN(line)) && block.length) {
-      blocks.push(block);
-      block = [];
-    }
-    block.push(line);
+document.getElementById('pdfInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  allLines = [];
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const lines = groupTextByY(content.items);
+    allLines.push(...lines);
   }
-  if (block.length) blocks.push(block);
-  return blocks;
+
+  renderLineSelector();
+});
+
+function renderLineSelector() {
+  const container = document.getElementById('textLines');
+  container.innerHTML = '';
+  allLines.forEach((line, index) => {
+    const div = document.createElement('div');
+    div.textContent = `${index + 1}. ${removeVN(line)}`;
+    div.className = 'clickable';
+    div.onclick = () => handleLineClick(index);
+    container.appendChild(div);
+  });
 }
 
-function getHKD(block) {
-  for (let i = 0; i < block.length; i++) {
-    if (/ten nguoi mua/.test(removeVN(block[i]))) {
-      return block[i + 1]?.trim() || 'HKD không rõ';
-    }
+function handleLineClick(index) {
+  if (selectedStart === null || (selectedStart !== null && selectedEnd !== null)) {
+    selectedStart = index;
+    selectedEnd = null;
+  } else {
+    selectedEnd = index;
+    if (selectedStart > selectedEnd) [selectedStart, selectedEnd] = [selectedEnd, selectedStart];
+    processSelectedLines();
   }
-  return 'HKD không rõ';
+  updateHighlights();
 }
 
-function getNPP(block) {
-  for (let i = 0; i < block.length; i++) {
-    if (/ten nguoi ban/.test(removeVN(block[i]))) {
-      return block[i + 1]?.trim() || 'NPP không rõ';
-    }
-  }
-  return 'NPP không rõ';
+function updateHighlights() {
+  const lines = document.querySelectorAll('#textLines div');
+  lines.forEach((div, idx) => {
+    if (selectedStart !== null && selectedEnd === null && idx === selectedStart)
+      div.classList.add('highlight');
+    else if (selectedStart !== null && selectedEnd !== null &&
+      idx >= selectedStart && idx <= selectedEnd)
+      div.classList.add('highlight');
+    else
+      div.classList.remove('highlight');
+  });
 }
 
-function extractDataFromBlock(block) {
-  const HKD = getHKD(block);
-  const NPP = getNPP(block);
+function processSelectedLines() {
+  const selected = allLines.slice(selectedStart, selectedEnd + 1);
   const data = [];
 
-  const start = block.findIndex(l => /hang hoa, dich vu/.test(removeVN(l)));
-  if (start === -1) return { HKD, NPP, data };
-
-  for (let i = start + 1; i < block.length; i++) {
-    const line = block[i];
-    if (/^tong|^thue|^tong tien|^chu ky/.test(removeVN(line))) break;
-
+  selected.forEach((line) => {
     const parts = line.trim().split(/\s+/);
-    if (parts.length < 6) continue;
+    if (parts.length < 6) return;
 
     const last = parts.slice(-6);
-    if (!last[0] || !isNaN(last[0]) === false) continue; // không có DVT thì bỏ
+    if (!last[0] || !isNaN(last[0]) === false) return; // bỏ dòng không có DVT
 
     let name = parts.slice(0, parts.length - 6).join(' ');
-    name = name.replace(/^\d+\s*/g, '').replace(/^hang\s*/i, '');
+    name = name.replace(/^\d+\s*/, '').replace(/^Hang\s*/i, '');
 
     const sl = parseFloat(last[1].replace(',', '.')) || 0;
-    const giaRaw = last[2].replace(/\./g, '').replace(',', '.');
-    const gia = parseFloat(giaRaw) || 0;
+    const dg = parseFloat(last[2].replace(/\./g, '').replace(',', '.')) || 0;
+    const tt = sl * dg;
 
     data.push({
       ten: name,
       dvt: last[0],
-      sl,
-      gia,
+      sl: sl,
+      gia: dg,
       ck: last[3],
       thue: last[4],
-      tt: gia * sl,
-      loai: 'Hàng hóa',
-      hkd: HKD,
-      npp: NPP
+      tt: tt
     });
-  }
-
-  return { HKD, NPP, data };
-}
-
-function displayHKDList() {
-  const list = document.getElementById('hkdList');
-  list.innerHTML = '';
-  Object.keys(hkdData).forEach(hkd => {
-    const li = document.createElement('li');
-    li.textContent = hkd;
-    li.onclick = () => showTableFor(hkd);
-    list.appendChild(li);
   });
+
+  renderTable(data);
 }
 
-function showTableFor(hkd) {
-  currentHKD = hkd;
-  const items = hkdData[hkd];
-  const output = document.getElementById('output');
-  if (!items || items.length === 0) {
-    output.innerHTML = '<i>Không có dữ liệu</i>';
+function renderTable(data) {
+  const result = document.getElementById('result');
+  if (data.length === 0) {
+    result.innerHTML = '<i>Không có dữ liệu</i>';
     return;
   }
 
-  let html = `<button onclick="addRow()">➕ Thêm hàng thủ công</button>
-  <table id="itemTable"><thead><tr>
-    <th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th>
-    <th>Đơn giá</th><th>Chiết khấu</th><th>Thuế suất</th><th>Thành tiền</th>
-    <th>Loại</th><th>HKD</th><th>NPP</th><th></th>
-  </tr></thead><tbody>`;
+  let html = `<table id="itemTable">
+    <thead><tr>
+      <th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th>
+      <th>Đơn giá</th><th>Chiết khấu</th><th>Thuế suất</th><th>Thành tiền</th>
+      <th></th>
+    </tr></thead><tbody>`;
 
-  items.forEach((p, i) => {
+  data.forEach((p, i) => {
     html += `<tr>
-      <td class="center">${i + 1}</td>
+      <td>${i + 1}</td>
       <td><input value="${p.ten}"></td>
       <td><input value="${p.dvt}"></td>
       <td><input class="sl" type="number" value="${p.sl}" oninput="updateTotals()"></td>
@@ -167,23 +165,24 @@ function showTableFor(hkd) {
       <td><input value="${p.ck}"></td>
       <td><input value="${p.thue}"></td>
       <td><input class="tt" type="text" value="${p.tt.toLocaleString('vi-VN')}" readonly></td>
-      <td><input value="${p.loai}"></td>
-      <td><input value="${p.hkd}"></td>
-      <td><input value="${p.npp}"></td>
       <td><button class="btn-small" onclick="this.closest('tr').remove(); updateTotals()">❌</button></td>
     </tr>`;
   });
 
   html += `</tbody>
-    <tfoot><tr>
-      <td colspan="3"><b>Tổng</b></td>
-      <td id="totalQty" class="center">0</td>
-      <td></td><td></td><td></td>
-      <td id="totalAmt" class="center">0</td>
-      <td colspan="4"></td>
-    </tr></tfoot>
-  </table>`;
-  output.innerHTML = html;
+    <tfoot>
+      <tr>
+        <td colspan="3"><b>Tổng</b></td>
+        <td id="totalQty" class="center">0</td>
+        <td></td><td></td><td></td>
+        <td id="totalAmt" class="center">0</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+  <button onclick="addRow()">➕ Thêm hàng</button>`;
+
+  result.innerHTML = html;
   updateTotals();
 }
 
@@ -191,13 +190,11 @@ function addRow() {
   const tbody = document.querySelector('#itemTable tbody');
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td class="center">#</td>
-    <td><input></td><td><input></td>
+    <td>#</td><td><input></td><td><input></td>
     <td><input class="sl" type="number" value="0" oninput="updateTotals()"></td>
     <td><input class="dg" type="text" value="0" oninput="updateTotals()"></td>
     <td><input></td><td><input></td>
     <td><input class="tt" type="text" value="0" readonly></td>
-    <td><input></td><td><input value="${currentHKD}"></td><td><input></td>
     <td><button class="btn-small" onclick="this.closest('tr').remove(); updateTotals()">❌</button></td>`;
   tbody.appendChild(tr);
   updateTotals();
@@ -209,7 +206,7 @@ function updateTotals() {
     row.children[0].innerText = i + 1;
     const sl = parseFloat(row.querySelector('.sl')?.value) || 0;
     const dgRaw = row.querySelector('.dg')?.value || '0';
-    const dg = parseFloat(dgRaw.replaceAll('.', '').replace(',', '.')) || 0;
+    const dg = parseFloat(dgRaw.replace(/\./g, '').replace(',', '.')) || 0;
     const tt = sl * dg;
     row.querySelector('.tt').value = tt.toLocaleString('vi-VN');
     totalQty += sl;
@@ -218,37 +215,6 @@ function updateTotals() {
   document.getElementById('totalQty').innerText = totalQty;
   document.getElementById('totalAmt').innerText = totalAmt.toLocaleString('vi-VN');
 }
-
-document.getElementById('pdfInput').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const status = document.getElementById('status');
-  status.innerText = '📥 Đang xử lý...';
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-  let allLines = [];
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const lines = groupTextByY(content.items);
-    allLines.push(...lines);
-  }
-
-  const blocks = parseInvoiceBlocks(allLines);
-
-  for (const block of blocks) {
-    const parsed = extractDataFromBlock(block);
-    if (!parsed.HKD || parsed.data.length === 0) continue;
-    if (!hkdData[parsed.HKD]) hkdData[parsed.HKD] = [];
-    hkdData[parsed.HKD].push(...parsed.data);
-  }
-
-  displayHKDList();
-  status.innerText = `✅ Xử lý xong ${blocks.length} hóa đơn`;
-});
 </script>
 </body>
 </html>
