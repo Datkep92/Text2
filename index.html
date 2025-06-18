@@ -1,220 +1,541 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <title>Trích xuất bảng kê hoá đơn PDF - Chọn thủ công</title>
-  <style>
-    body { font-family: Arial; margin: 20px; }
-    textarea, pre { width: 100%; height: 200px; font-family: monospace; }
-    .highlight { background-color: #dff0d8; }
-    .clickable { cursor: pointer; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 5px; font-size: 13px; }
-    input { width: 100%; }
-    .btn-small { font-size: 11px; padding: 2px 5px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Quản Lý Hóa Đơn</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .input-section, .output-section {
+            flex: 1;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .total-section {
+            margin-top: 20px;
+            font-weight: bold;
+            text-align: right;
+        }
+        .item-row {
+            cursor: pointer;
+        }
+        .item-row:hover {
+            background-color: #f5f5f5;
+        }
+        .search-box {
+            margin-bottom: 20px;
+        }
+        #invoiceList {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .invoice-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .invoice-item:hover {
+            background-color: #f0f8ff;
+        }
+    </style>
 </head>
 <body>
+    <h1>Hệ Thống Quản Lý Hóa Đơn</h1>
+    
+    <div class="container">
+        <div class="input-section">
+            <h2>Nhập Thông Tin Hóa Đơn</h2>
+            
+            <div class="form-group">
+                <label for="invoiceNumber">Số hóa đơn:</label>
+                <input type="text" id="invoiceNumber" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="invoiceDate">Ngày lập:</label>
+                <input type="date" id="invoiceDate" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="sellerName">Tên người bán:</label>
+                <input type="text" id="sellerName" value="CHI NHÁNH CÔNG TY TNHH THƯƠNG MẠI ĐẶC HƯNG TẠI NINH THUẬN" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="sellerTaxCode">Mã số thuế người bán:</label>
+                <input type="text" id="sellerTaxCode" value="5900981971-004" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="buyerName">Tên người mua:</label>
+                <input type="text" id="buyerName" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="buyerTaxCode">Mã số thuế người mua:</label>
+                <input type="text" id="buyerTaxCode" required>
+            </div>
+            
+            <h3>Thêm Hàng Hóa/Dịch Vụ</h3>
+            
+            <div class="form-group">
+                <label for="itemName">Tên hàng hóa/dịch vụ:</label>
+                <input type="text" id="itemName" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="itemUnit">Đơn vị tính:</label>
+                <input type="text" id="itemUnit" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="itemQuantity">Số lượng:</label>
+                <input type="number" id="itemQuantity" min="1" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="itemPrice">Đơn giá (VND):</label>
+                <input type="number" id="itemPrice" min="0" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="itemTaxRate">Thuế suất (%):</label>
+                <select id="itemTaxRate">
+                    <option value="0">0%</option>
+                    <option value="5">5%</option>
+                    <option value="8">8%</option>
+                    <option value="10" selected>10%</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="itemDiscount">Chiết khấu (VND):</label>
+                <input type="number" id="itemDiscount" min="0" value="0">
+            </div>
+            
+            <button id="addItemBtn">Thêm hàng hóa</button>
+            <button id="saveInvoiceBtn">Lưu hóa đơn</button>
+            <button id="resetBtn">Làm mới</button>
+            
+            <table id="itemsTable">
+                <thead>
+                    <tr>
+                        <th>Tên hàng hóa</th>
+                        <th>Đơn vị</th>
+                        <th>Số lượng</th>
+                        <th>Đơn giá</th>
+                        <th>Thuế suất</th>
+                        <th>Chiết khấu</th>
+                        <th>Thành tiền</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsList">
+                    <!-- Các hàng hóa sẽ được thêm vào đây -->
+                </tbody>
+            </table>
+            
+            <div class="total-section">
+                <p>Tổng tiền chưa thuế: <span id="subtotal">0</span> VND</p>
+                <p>Tổng tiền thuế: <span id="taxTotal">0</span> VND</p>
+                <p>Tổng tiền thanh toán: <span id="grandTotal">0</span> VND</p>
+            </div>
+        </div>
+        
+        <div class="output-section">
+            <h2>Truy Xuất Hóa Đơn</h2>
+            
+            <div class="search-box">
+                <label for="searchInput">Tìm kiếm hóa đơn:</label>
+                <input type="text" id="searchInput" placeholder="Nhập số hóa đơn, tên người mua...">
+                <button id="searchBtn">Tìm kiếm</button>
+            </div>
+            
+            <div id="invoiceList">
+                <!-- Danh sách hóa đơn sẽ hiển thị ở đây -->
+            </div>
+            
+            <div id="invoiceDetails">
+                <h3>Chi Tiết Hóa Đơn</h3>
+                <div id="invoiceInfo"></div>
+                
+                <table id="invoiceItemsTable">
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            <th>Tên hàng hóa</th>
+                            <th>Đơn vị</th>
+                            <th>Số lượng</th>
+                            <th>Đơn giá</th>
+                            <th>Thuế suất</th>
+                            <th>Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoiceItemsList">
+                        <!-- Chi tiết hàng hóa của hóa đơn được chọn -->
+                    </tbody>
+                </table>
+                
+                <div class="total-section">
+                    <p>Tổng tiền chưa thuế: <span id="detailSubtotal">0</span> VND</p>
+                    <p>Tổng tiền thuế: <span id="detailTaxTotal">0</span> VND</p>
+                    <p>Tổng tiền thanh toán: <span id="detailGrandTotal">0</span> VND</p>
+                </div>
+                
+                <button id="printBtn">In hóa đơn</button>
+                <button id="exportPdfBtn">Xuất PDF</button>
+            </div>
+        </div>
+    </div>
 
-<h3>📄 B1: Tải file PDF → Hiển thị toàn bộ nội dung</h3>
-<input type="file" id="pdfInput" accept="application/pdf">
-<p><b>🖱️ Click dòng bắt đầu và kết thúc bảng kê để chọn vùng cần phân tích.</b></p>
-<pre id="textLines"></pre>
-
-<h3>📊 B2: Kết quả bảng kê</h3>
-<div id="result"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
-<script>
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
-
-let allLines = [];
-let selectedStart = null;
-let selectedEnd = null;
-
-function removeVN(str) {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d").replace(/Đ/g, "D");
-}
-
-function groupTextByY(items) {
-  const lines = {};
-  for (const item of items) {
-    const y = Math.round(item.transform[5]);
-    const x = item.transform[4];
-    if (!lines[y]) lines[y] = [];
-    lines[y].push({ x, str: item.str });
-  }
-
-  const sortedY = Object.keys(lines).sort((a, b) => b - a);
-  return sortedY.map((y) =>
-    lines[y].sort((a, b) => a.x - b.x).map((t) => t.str).join(' ')
-  );
-}
-
-document.getElementById('pdfInput').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-  allLines = [];
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const lines = groupTextByY(content.items);
-    allLines.push(...lines);
-  }
-
-  renderLineSelector();
-});
-
-function renderLineSelector() {
-  const container = document.getElementById('textLines');
-  container.innerHTML = '';
-  allLines.forEach((line, index) => {
-    const div = document.createElement('div');
-    div.textContent = `${index + 1}. ${removeVN(line)}`;
-    div.className = 'clickable';
-    div.onclick = () => handleLineClick(index);
-    container.appendChild(div);
-  });
-}
-
-function handleLineClick(index) {
-  if (selectedStart === null || (selectedStart !== null && selectedEnd !== null)) {
-    selectedStart = index;
-    selectedEnd = null;
-  } else {
-    selectedEnd = index;
-    if (selectedStart > selectedEnd) [selectedStart, selectedEnd] = [selectedEnd, selectedStart];
-    processSelectedLines();
-  }
-  updateHighlights();
-}
-
-function updateHighlights() {
-  const lines = document.querySelectorAll('#textLines div');
-  lines.forEach((div, idx) => {
-    if (selectedStart !== null && selectedEnd === null && idx === selectedStart)
-      div.classList.add('highlight');
-    else if (selectedStart !== null && selectedEnd !== null &&
-      idx >= selectedStart && idx <= selectedEnd)
-      div.classList.add('highlight');
-    else
-      div.classList.remove('highlight');
-  });
-}
-
-function processSelectedLines() {
-  const selected = allLines.slice(selectedStart, selectedEnd + 1);
-  const data = [];
-
-  selected.forEach((line) => {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 6) return;
-
-    const last = parts.slice(-6);
-    if (!last[0] || !isNaN(last[0]) === false) return; // bỏ dòng không có DVT
-
-    let name = parts.slice(0, parts.length - 6).join(' ');
-    name = name.replace(/^\d+\s*/, '').replace(/^Hang\s*/i, '');
-
-    const sl = parseFloat(last[1].replace(',', '.')) || 0;
-    const dg = parseFloat(last[2].replace(/\./g, '').replace(',', '.')) || 0;
-    const tt = sl * dg;
-
-    data.push({
-      ten: name,
-      dvt: last[0],
-      sl: sl,
-      gia: dg,
-      ck: last[3],
-      thue: last[4],
-      tt: tt
-    });
-  });
-
-  renderTable(data);
-}
-
-function renderTable(data) {
-  const result = document.getElementById('result');
-  if (data.length === 0) {
-    result.innerHTML = '<i>Không có dữ liệu</i>';
-    return;
-  }
-
-  let html = `<table id="itemTable">
-    <thead><tr>
-      <th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th>
-      <th>Đơn giá</th><th>Chiết khấu</th><th>Thuế suất</th><th>Thành tiền</th>
-      <th></th>
-    </tr></thead><tbody>`;
-
-  data.forEach((p, i) => {
-    html += `<tr>
-      <td>${i + 1}</td>
-      <td><input value="${p.ten}"></td>
-      <td><input value="${p.dvt}"></td>
-      <td><input class="sl" type="number" value="${p.sl}" oninput="updateTotals()"></td>
-      <td><input class="dg" type="text" value="${p.gia.toLocaleString('vi-VN')}" oninput="updateTotals()"></td>
-      <td><input value="${p.ck}"></td>
-      <td><input value="${p.thue}"></td>
-      <td><input class="tt" type="text" value="${p.tt.toLocaleString('vi-VN')}" readonly></td>
-      <td><button class="btn-small" onclick="this.closest('tr').remove(); updateTotals()">❌</button></td>
-    </tr>`;
-  });
-
-  html += `</tbody>
-    <tfoot>
-      <tr>
-        <td colspan="3"><b>Tổng</b></td>
-        <td id="totalQty" class="center">0</td>
-        <td></td><td></td><td></td>
-        <td id="totalAmt" class="center">0</td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
-  <button onclick="addRow()">➕ Thêm hàng</button>`;
-
-  result.innerHTML = html;
-  updateTotals();
-}
-
-function addRow() {
-  const tbody = document.querySelector('#itemTable tbody');
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td>#</td><td><input></td><td><input></td>
-    <td><input class="sl" type="number" value="0" oninput="updateTotals()"></td>
-    <td><input class="dg" type="text" value="0" oninput="updateTotals()"></td>
-    <td><input></td><td><input></td>
-    <td><input class="tt" type="text" value="0" readonly></td>
-    <td><button class="btn-small" onclick="this.closest('tr').remove(); updateTotals()">❌</button></td>`;
-  tbody.appendChild(tr);
-  updateTotals();
-}
-
-function updateTotals() {
-  let totalQty = 0, totalAmt = 0;
-  document.querySelectorAll('#itemTable tbody tr').forEach((row, i) => {
-    row.children[0].innerText = i + 1;
-    const sl = parseFloat(row.querySelector('.sl')?.value) || 0;
-    const dgRaw = row.querySelector('.dg')?.value || '0';
-    const dg = parseFloat(dgRaw.replace(/\./g, '').replace(',', '.')) || 0;
-    const tt = sl * dg;
-    row.querySelector('.tt').value = tt.toLocaleString('vi-VN');
-    totalQty += sl;
-    totalAmt += tt;
-  });
-  document.getElementById('totalQty').innerText = totalQty;
-  document.getElementById('totalAmt').innerText = totalAmt.toLocaleString('vi-VN');
-}
-</script>
+    <script>
+        // Lưu trữ dữ liệu hóa đơn
+        let invoices = [];
+        let currentItems = [];
+        
+        // DOM Elements
+        const addItemBtn = document.getElementById('addItemBtn');
+        const saveInvoiceBtn = document.getElementById('saveInvoiceBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const searchBtn = document.getElementById('searchBtn');
+        const printBtn = document.getElementById('printBtn');
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
+        
+        // Input fields
+        const invoiceNumber = document.getElementById('invoiceNumber');
+        const invoiceDate = document.getElementById('invoiceDate');
+        const sellerName = document.getElementById('sellerName');
+        const sellerTaxCode = document.getElementById('sellerTaxCode');
+        const buyerName = document.getElementById('buyerName');
+        const buyerTaxCode = document.getElementById('buyerTaxCode');
+        const itemName = document.getElementById('itemName');
+        const itemUnit = document.getElementById('itemUnit');
+        const itemQuantity = document.getElementById('itemQuantity');
+        const itemPrice = document.getElementById('itemPrice');
+        const itemTaxRate = document.getElementById('itemTaxRate');
+        const itemDiscount = document.getElementById('itemDiscount');
+        
+        // Tables
+        const itemsList = document.getElementById('itemsList');
+        const invoiceList = document.getElementById('invoiceList');
+        const invoiceInfo = document.getElementById('invoiceInfo');
+        const invoiceItemsList = document.getElementById('invoiceItemsList');
+        
+        // Total fields
+        const subtotal = document.getElementById('subtotal');
+        const taxTotal = document.getElementById('taxTotal');
+        const grandTotal = document.getElementById('grandTotal');
+        const detailSubtotal = document.getElementById('detailSubtotal');
+        const detailTaxTotal = document.getElementById('detailTaxTotal');
+        const detailGrandTotal = document.getElementById('detailGrandTotal');
+        
+        // Khởi tạo ngày mặc định là ngày hiện tại
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            invoiceDate.value = today;
+            
+            // Load dữ liệu từ localStorage nếu có
+            const savedInvoices = localStorage.getItem('invoices');
+            if (savedInvoices) {
+                invoices = JSON.parse(savedInvoices);
+                renderInvoiceList();
+            }
+        });
+        
+        // Thêm hàng hóa vào hóa đơn hiện tại
+        addItemBtn.addEventListener('click', function() {
+            const name = itemName.value.trim();
+            const unit = itemUnit.value.trim();
+            const quantity = parseFloat(itemQuantity.value);
+            const price = parseFloat(itemPrice.value);
+            const taxRate = parseFloat(itemTaxRate.value);
+            const discount = parseFloat(itemDiscount.value) || 0;
+            
+            if (!name || !unit || isNaN(quantity) || isNaN(price)) {
+                alert('Vui lòng điền đầy đủ thông tin hàng hóa');
+                return;
+            }
+            
+            const amount = (price * quantity) - discount;
+            const taxAmount = amount * (taxRate / 100);
+            const totalAmount = amount + taxAmount;
+            
+            const newItem = {
+                name,
+                unit,
+                quantity,
+                price,
+                taxRate,
+                discount,
+                amount,
+                taxAmount,
+                totalAmount
+            };
+            
+            currentItems.push(newItem);
+            renderCurrentItems();
+            calculateTotals();
+            
+            // Reset input fields
+            itemName.value = '';
+            itemUnit.value = '';
+            itemQuantity.value = '';
+            itemPrice.value = '';
+            itemDiscount.value = '0';
+            itemName.focus();
+        });
+        
+        // Lưu hóa đơn
+        saveInvoiceBtn.addEventListener('click', function() {
+            if (!invoiceNumber.value.trim()) {
+                alert('Vui lòng nhập số hóa đơn');
+                return;
+            }
+            
+            if (!buyerName.value.trim() || !buyerTaxCode.value.trim()) {
+                alert('Vui lòng nhập thông tin người mua');
+                return;
+            }
+            
+            if (currentItems.length === 0) {
+                alert('Hóa đơn phải có ít nhất một mặt hàng');
+                return;
+            }
+            
+            const newInvoice = {
+                invoiceNumber: invoiceNumber.value.trim(),
+                invoiceDate: invoiceDate.value,
+                sellerName: sellerName.value.trim(),
+                sellerTaxCode: sellerTaxCode.value.trim(),
+                buyerName: buyerName.value.trim(),
+                buyerTaxCode: buyerTaxCode.value.trim(),
+                items: [...currentItems],
+                subtotal: parseFloat(subtotal.textContent.replace(/,/g, '')),
+                taxTotal: parseFloat(taxTotal.textContent.replace(/,/g, '')),
+                grandTotal: parseFloat(grandTotal.textContent.replace(/,/g, ''))
+            };
+            
+            // Kiểm tra nếu hóa đơn đã tồn tại thì cập nhật
+            const existingIndex = invoices.findIndex(inv => inv.invoiceNumber === newInvoice.invoiceNumber);
+            if (existingIndex !== -1) {
+                invoices[existingIndex] = newInvoice;
+            } else {
+                invoices.push(newInvoice);
+            }
+            
+            // Lưu vào localStorage
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            
+            alert('Hóa đơn đã được lưu thành công!');
+            renderInvoiceList();
+            resetForm();
+        });
+        
+        // Làm mới form
+        resetBtn.addEventListener('click', resetForm);
+        
+        // Tìm kiếm hóa đơn
+        searchBtn.addEventListener('click', function() {
+            const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+            if (!searchTerm) {
+                renderInvoiceList();
+                return;
+            }
+            
+            const filteredInvoices = invoices.filter(invoice => 
+                invoice.invoiceNumber.toLowerCase().includes(searchTerm) ||
+                invoice.buyerName.toLowerCase().includes(searchTerm) ||
+                invoice.buyerTaxCode.toLowerCase().includes(searchTerm)
+            );
+            
+            renderInvoiceList(filteredInvoices);
+        });
+        
+        // In hóa đơn
+        printBtn.addEventListener('click', function() {
+            window.print();
+        });
+        
+        // Xuất PDF (chức năng mẫu)
+        exportPdfBtn.addEventListener('click', function() {
+            alert('Chức năng xuất PDF sẽ được thực hiện ở phiên bản sau');
+        });
+        
+        // Hiển thị danh sách hàng hóa hiện tại
+        function renderCurrentItems() {
+            itemsList.innerHTML = '';
+            
+            currentItems.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.className = 'item-row';
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.unit}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.price.toLocaleString()}</td>
+                    <td>${item.taxRate}%</td>
+                    <td>${item.discount.toLocaleString()}</td>
+                    <td>${item.totalAmount.toLocaleString()}</td>
+                    <td><button class="remove-item" data-index="${index}">Xóa</button></td>
+                `;
+                itemsList.appendChild(row);
+            });
+            
+            // Thêm sự kiện cho nút xóa
+            document.querySelectorAll('.remove-item').forEach(button => {
+                button.addEventListener('click', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    currentItems.splice(index, 1);
+                    renderCurrentItems();
+                    calculateTotals();
+                });
+            });
+        }
+        
+        // Hiển thị danh sách hóa đơn
+        function renderInvoiceList(invoiceArray = invoices) {
+            invoiceList.innerHTML = '';
+            
+            if (invoiceArray.length === 0) {
+                invoiceList.innerHTML = '<p>Không có hóa đơn nào</p>';
+                return;
+            }
+            
+            invoiceArray.forEach(invoice => {
+                const invoiceElement = document.createElement('div');
+                invoiceElement.className = 'invoice-item';
+                invoiceElement.innerHTML = `
+                    <p><strong>Số hóa đơn:</strong> ${invoice.invoiceNumber}</p>
+                    <p><strong>Ngày:</strong> ${invoice.invoiceDate}</p>
+                    <p><strong>Người mua:</strong> ${invoice.buyerName}</p>
+                    <p><strong>Tổng tiền:</strong> ${invoice.grandTotal.toLocaleString()} VND</p>
+                `;
+                
+                invoiceElement.addEventListener('click', function() {
+                    showInvoiceDetails(invoice);
+                });
+                
+                invoiceList.appendChild(invoiceElement);
+            });
+        }
+        
+        // Hiển thị chi tiết hóa đơn
+        function showInvoiceDetails(invoice) {
+            invoiceInfo.innerHTML = `
+                <p><strong>Số hóa đơn:</strong> ${invoice.invoiceNumber}</p>
+                <p><strong>Ngày lập:</strong> ${invoice.invoiceDate}</p>
+                <p><strong>Người bán:</strong> ${invoice.sellerName} (MST: ${invoice.sellerTaxCode})</p>
+                <p><strong>Người mua:</strong> ${invoice.buyerName} (MST: ${invoice.buyerTaxCode})</p>
+            `;
+            
+            invoiceItemsList.innerHTML = '';
+            invoice.items.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${item.name}</td>
+                    <td>${item.unit}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.price.toLocaleString()}</td>
+                    <td>${item.taxRate}%</td>
+                    <td>${item.totalAmount.toLocaleString()}</td>
+                `;
+                invoiceItemsList.appendChild(row);
+            });
+            
+            detailSubtotal.textContent = invoice.subtotal.toLocaleString();
+            detailTaxTotal.textContent = invoice.taxTotal.toLocaleString();
+            detailGrandTotal.textContent = invoice.grandTotal.toLocaleString();
+        }
+        
+        // Tính tổng tiền
+        function calculateTotals() {
+            const sub = currentItems.reduce((sum, item) => sum + item.amount, 0);
+            const tax = currentItems.reduce((sum, item) => sum + item.taxAmount, 0);
+            const grand = sub + tax;
+            
+            subtotal.textContent = sub.toLocaleString();
+            taxTotal.textContent = tax.toLocaleString();
+            grandTotal.textContent = grand.toLocaleString();
+        }
+        
+        // Reset form
+        function resetForm() {
+            invoiceNumber.value = '';
+            invoiceDate.value = new Date().toISOString().split('T')[0];
+            buyerName.value = '';
+            buyerTaxCode.value = '';
+            itemName.value = '';
+            itemUnit.value = '';
+            itemQuantity.value = '';
+            itemPrice.value = '';
+            itemDiscount.value = '0';
+            itemTaxRate.value = '10';
+            
+            currentItems = [];
+            itemsList.innerHTML = '';
+            
+            subtotal.textContent = '0';
+            taxTotal.textContent = '0';
+            grandTotal.textContent = '0';
+        }
+    </script>
 </body>
 </html>
