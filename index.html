@@ -2,106 +2,124 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>OCR bảng từ PDF (scan)</title>
+  <title>📄 PDF ➜ Bảng Excel chỉnh sửa trực tiếp</title>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body { font-family: Arial; margin: 20px; }
-    canvas { display: none; }
-    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 5px; font-size: 13px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 4px; }
+    input { width: 100%; border: none; background: transparent; }
+    input:focus { outline: 1px solid #00f; background: #e6f0ff; }
+    button { margin: 10px 5px 0 0; }
   </style>
 </head>
 <body>
 
-<h3>📄 OCR bảng từ file PDF (scan ảnh)</h3>
-<input type="file" id="pdfInput" accept="application/pdf"><br>
+<h3>📂 Chọn file PDF để hiển thị bảng như Excel</h3>
+<input type="file" id="pdfInput" accept="application/pdf">
+<button onclick="exportExcel()">⬇️ Xuất Excel</button>
+<button onclick="addRow()">➕ Thêm dòng</button>
 <div id="status">Chưa xử lý</div>
-<canvas id="pdfCanvas"></canvas>
-<div id="output"></div>
+<div id="tableContainer"></div>
 
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
 
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
   const status = document.getElementById('status');
-  const canvas = document.getElementById('pdfCanvas');
-  const ctx = canvas.getContext('2d');
-  const output = document.getElementById('output');
-
-  status.innerText = '📥 Đang load PDF...';
+  status.innerText = '📥 Đang xử lý PDF...';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const page = await pdf.getPage(1);
-  const viewport = page.getViewport({ scale: 2.0 });
+  let textContent = [];
 
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join('\n');
+    textContent.push(pageText);
+  }
 
-  await page.render({ canvasContext: ctx, viewport }).promise;
+  const allText = textContent.join('\n');
+  const lines = allText.split('\n').map(l => l.trim()).filter(l => l);
 
-  status.innerText = '🔍 Đang OCR...';
+  // Nhận dạng dòng bảng kê bằng cách có nhiều khoảng trắng
+  const tableLines = lines.filter(l => (l.match(/\s{2,}/g) || []).length > 2);
+  const tableData = tableLines.map(line =>
+    line.replace(/\s{2,}/g, '|').split('|').map(cell => cell.trim())
+  );
 
-  const result = await Tesseract.recognize(canvas.toDataURL(), 'vie', {
-    logger: m => console.log(m)
-  });
-
-  const lines = groupByLines(result.data.words);
-  const parsedRows = lines.map(parseRowByX);
-  displayTable(parsedRows);
-  status.innerText = `✅ Đã trích xuất ${parsedRows.length} dòng`;
+  displayTable(tableData);
+  status.innerText = `✅ Đã đọc ${tableData.length} dòng bảng`;
 });
 
-// Gom từ theo y gần nhau
-function groupByLines(words) {
-  const lines = {};
-  for (let w of words) {
-    const y = Math.round(w.bbox.y0 / 5) * 5;
-    if (!lines[y]) lines[y] = [];
-    lines[y].push(w);
-  }
+function displayTable(data) {
+  const container = document.getElementById('tableContainer');
+  if (data.length === 0) return container.innerHTML = '<i>Không tìm thấy bảng</i>';
 
-  const sortedY = Object.keys(lines).sort((a, b) => a - b);
-  return sortedY.map(y => lines[y].sort((a, b) => a.bbox.x0 - b.bbox.x0));
-}
+  let html = '<table id="editableTable"><thead><tr>';
+  const cols = data[0].length;
+  for (let i = 0; i < cols; i++) html += `<th>Cột ${i+1}</th>`;
+  html += '</tr></thead><tbody>';
 
-// Chia theo x để tách cột
-function parseRowByX(words) {
-  const row = ['', '', '', '', '', '', '', ''];
-  for (let w of words) {
-    const x = w.bbox.x0;
-
-    if (x < 40) row[0] += ' ' + w.text;         // STT
-    else if (x < 160) row[1] += ' ' + w.text;   // Tính chất / loại
-    else if (x < 330) row[2] += ' ' + w.text;   // Tên hàng
-    else if (x < 400) row[3] += ' ' + w.text;   // ĐVT
-    else if (x < 470) row[4] += ' ' + w.text;   // SL
-    else if (x < 570) row[5] += ' ' + w.text;   // Đơn giá
-    else if (x < 630) row[6] += ' ' + w.text;   // Chiết khấu
-    else row[7] += ' ' + w.text;                // Thành tiền
-  }
-  return row.map(c => c.trim());
-}
-
-// Hiển thị bảng kết quả
-function displayTable(rows) {
-  let html = `<table><thead><tr>
-    <th>STT</th><th>Tính chất</th><th>Tên hàng</th><th>ĐVT</th>
-    <th>Số lượng</th><th>Đơn giá</th><th>Chiết khấu</th><th>Thành tiền</th>
-  </tr></thead><tbody>`;
-
-  rows.forEach(r => {
-    if (r.filter(Boolean).length >= 5) {
-      html += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>';
-    }
+  data.forEach(row => {
+    html += '<tr>' + row.map(cell =>
+      `<td><input value="${cell}" oninput="updateTotals()"></td>`
+    ).join('') + '</tr>';
   });
 
+  html += `<tr><td colspan="${cols - 2}"><b>Tổng</b></td>
+            <td id="totalSL"></td><td id="totalTT"></td></tr>`;
   html += '</tbody></table>';
-  document.getElementById('output').innerHTML = html;
+  container.innerHTML = html;
+  updateTotals();
+}
+
+function addRow() {
+  const table = document.getElementById('editableTable').getElementsByTagName('tbody')[0];
+  const cols = table.rows[0].cells.length;
+  const tr = document.createElement('tr');
+  for (let i = 0; i < cols; i++) {
+    const td = document.createElement('td');
+    const input = document.createElement('input');
+    input.oninput = updateTotals;
+    td.appendChild(input);
+    tr.appendChild(td);
+  }
+  table.insertBefore(tr, table.lastElementChild); // chèn trước dòng tổng
+}
+
+function updateTotals() {
+  let totalSL = 0, totalTT = 0;
+  const table = document.getElementById('editableTable');
+  if (!table) return;
+
+  const rows = table.getElementsByTagName('tbody')[0].rows;
+  for (let i = 0; i < rows.length - 1; i++) {
+    const cells = rows[i].querySelectorAll('input');
+    const sl = parseFloat(cells[cells.length - 2]?.value.replace(/,/g, '')) || 0;
+    const tt = parseFloat(cells[cells.length - 1]?.value.replace(/,/g, '')) || 0;
+    totalSL += sl;
+    totalTT += tt;
+  }
+
+  document.getElementById('totalSL').innerText = totalSL;
+  document.getElementById('totalTT').innerText = totalTT.toLocaleString();
+}
+
+function exportExcel() {
+  const table = document.getElementById('editableTable');
+  if (!table) return;
+
+  const ws = XLSX.utils.table_to_sheet(table);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'BangKe');
+  XLSX.writeFile(wb, 'BangKe.xlsx');
 }
 </script>
 </body>
