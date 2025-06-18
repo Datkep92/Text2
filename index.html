@@ -2,30 +2,36 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Hiển thị toàn bộ nội dung PDF (có thể sửa)</title>
+  <title>Hiển thị nội dung PDF (chỉnh sửa được)</title>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
   <style>
     body { font-family: Arial; padding: 20px; }
     textarea {
       width: 100%;
-      height: 500px;
+      height: 600px;
       font-family: monospace;
       white-space: pre-wrap;
       padding: 10px;
       border: 1px solid #ccc;
+      background: #fff;
     }
   </style>
 </head>
 <body>
 
-<h3>📂 Chọn PDF để hiển thị nội dung chỉnh sửa được</h3>
+<h3>📂 Chọn file PDF để hiển thị nội dung (có thể sửa)</h3>
 <input type="file" id="pdfInput" accept="application/pdf">
 <div id="status">Chưa xử lý</div>
-<textarea id="pdfTextArea" placeholder="Toàn bộ nội dung PDF sẽ hiển thị tại đây..."></textarea>
+<textarea id="pdfTextArea" placeholder="Toàn bộ nội dung PDF sẽ hiển thị ở đây..."></textarea>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
+
+function removeVietnamese(str) {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+}
 
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
@@ -36,17 +42,32 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let fullText = '';
+  let resultLines = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageText = content.items.map(item => item.str).join(' ');
-    fullText += `--- Trang ${i} ---\n` + pageText + '\n\n';
+
+    let currentLine = '';
+    for (const item of content.items) {
+      const text = item.str.trim();
+      const noAccent = removeVietnamese(text);
+
+      if (/^trang\s*\d+$/i.test(noAccent)) continue;
+
+      if (/hang hoa|chiet khau/i.test(noAccent)) {
+        if (currentLine) resultLines.push(currentLine.trim());
+        currentLine = text;
+      } else {
+        currentLine += ' ' + text;
+      }
+    }
+
+    if (currentLine) resultLines.push(currentLine.trim());
   }
 
-  document.getElementById('pdfTextArea').value = fullText;
-  status.innerText = `✅ Đã tải ${pdf.numPages} trang`;
+  document.getElementById('pdfTextArea').value = resultLines.join('\n');
+  status.innerText = `✅ Đã xử lý ${pdf.numPages} trang`;
 });
 </script>
 </body>
