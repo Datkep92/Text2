@@ -2,206 +2,107 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Trích xuất hóa đơn - Nhóm theo HKD</title>
+  <title>OCR bảng từ PDF (scan)</title>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
   <style>
-    body { font-family: Arial; display: flex; gap: 20px; padding: 20px; }
-    #left { width: 220px; }
-    #left ul { list-style: none; padding: 0; }
-    #left li { cursor: pointer; margin: 6px 0; color: blue; text-decoration: underline; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    body { font-family: Arial; margin: 20px; }
+    canvas { display: none; }
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
     th, td { border: 1px solid #ccc; padding: 5px; font-size: 13px; }
   </style>
 </head>
 <body>
 
-<div id="left">
-  <h4>📋 Danh sách HKD</h4>
-  <ul id="hkdList"></ul>
-</div>
+<h3>📄 OCR bảng từ file PDF (scan ảnh)</h3>
+<input type="file" id="pdfInput" accept="application/pdf"><br>
+<div id="status">Chưa xử lý</div>
+<canvas id="pdfCanvas"></canvas>
+<div id="output"></div>
 
-<div id="right">
-  <h3>📄 Bảng kê hàng hóa</h3>
-  <input type="file" id="pdfInput" accept="application/pdf"><br>
-  <div id="status">Chưa xử lý</div>
-  <div id="output"></div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
-
-const hkdData = {};
-const DVT_LIST = ['chai','tui','hop','goi','day','bo','kg','ml','l','lit','vi','tuyp','lon'];
-
-function removeVN(str) {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/g,"d").replace(/Đ/g,"D").toLowerCase();
-}
-
-function groupTextByY(items) {
-  const lines = {};
-  for (const item of items) {
-    const y = Math.round(item.transform[5]);
-    const x = item.transform[4];
-    if (!lines[y]) lines[y] = [];
-    lines[y].push({ x, str: item.str });
-  }
-  const sortedY = Object.keys(lines).sort((a,b) => b - a);
-  return sortedY.map(y => lines[y].sort((a,b) => a.x - b.x).map(t => t.str).join(' '));
-}
-
-function parseInvoiceBlocks(lines) {
-  const blocks = [];
-  let block = [];
-  for (const line of lines) {
-    if (/^mau so|^ky hieu|^hoa don gia tri/i.test(line) && block.length) {
-      blocks.push(block);
-      block = [];
-    }
-    block.push(line);
-  }
-  if (block.length) blocks.push(block);
-  return blocks;
-}
-
-function isValidBlock(parts) {
-  if (parts.length < 6) return false;
-  const last = parts.slice(-6);
-  const dvt = last[0].toLowerCase();
-  const sl = parseFloat(last[1].replace(',', '.'));
-  const gia = parseFloat(last[2].replace(/\./g, '').replace(',', '.'));
-  const tt = parseFloat(last[5].replace(/\./g, '').replace(',', '.'));
-  if (!DVT_LIST.includes(dvt)) return false;
-  if (!Number.isFinite(sl)) return false;
-  if (!Number.isFinite(gia) || gia <= 0) return false;
-  if (!Number.isFinite(tt)) return false;
-  const expected = Math.round(sl * gia);
-  return Math.abs(expected - tt) <= 1000;
-}
-
-function extractDataFromBlock(block) {
-  const getField = (keys) => {
-    for (let line of block) {
-      const norm = removeVN(line);
-      for (let key of keys)
-        if (norm.includes(key)) return line.split(':').slice(1).join(':').trim();
-    }
-    return '';
-  };
-  const HKD = getField(['ten nguoi mua', 'ho ten nguoi mua']);
-  const NPP = getField(['ten nguoi ban']);
-  const data = [];
-  const start = block.findIndex(l => removeVN(l).includes('hang hoa, dich vu'));
-  if (start === -1) return { HKD, NPP, data };
-
-  for (let i = start + 1; i < block.length; i++) {
-    const line = block[i];
-    const raw = removeVN(line);
-    if (/^tong|^thue|^chu ky|^so:/.test(raw)) break;
-    const parts = line.trim().split(/\s+/);
-
-    if (raw.includes('chiet khau thuong mai')) {
-      const next = block[i + 1]?.trim().split(/\s+/) || [];
-      if (next.length >= 6) {
-        data.push({
-          ten: line,
-          dvt: '',
-          sl: parseFloat(next[1].replace(',', '.')) || 0,
-          gia: parseFloat(next[2].replace(/\./g, '').replace(',', '.')) || 0,
-          ck: next[3],
-          thue: next[4],
-          tt: parseFloat(next[5].replace(/\./g, '').replace(',', '.')) || 0,
-          loai: 'Chiết khấu',
-          hkd: HKD,
-          npp: NPP
-        });
-        i++; // bỏ qua dòng tiếp theo
-      }
-      continue;
-    }
-
-    if (!isValidBlock(parts)) continue;
-
-    const last = parts.slice(-6);
-    const ten = parts.slice(0, parts.length - 6).join(' ').replace(/^hang\s*/i, '').replace(/^\d+\s*/, '');
-    data.push({
-      ten: ten,
-      dvt: last[0],
-      sl: parseFloat(last[1].replace(',', '.')),
-      gia: parseFloat(last[2].replace(/\./g, '').replace(',', '.')),
-      ck: last[3],
-      thue: last[4],
-      tt: parseFloat(last[5].replace(/\./g, '').replace(',', '.')),
-      loai: 'Hàng hóa',
-      hkd: HKD,
-      npp: NPP
-    });
-  }
-
-  return { HKD, NPP, data };
-}
-
-function displayHKDList() {
-  const ul = document.getElementById('hkdList');
-  ul.innerHTML = '';
-  Object.keys(hkdData).forEach(hkd => {
-    const li = document.createElement('li');
-    li.textContent = hkd;
-    li.onclick = () => showTableFor(hkd);
-    ul.appendChild(li);
-  });
-}
-
-function showTableFor(hkd) {
-  const items = hkdData[hkd];
-  const output = document.getElementById('output');
-  if (!items) return output.innerHTML = '<i>Không có dữ liệu</i>';
-
-  let html = `<table><thead><tr>
-    <th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th>
-    <th>Đơn giá</th><th>Chiết khấu</th><th>Thuế</th><th>Thành tiền</th>
-    <th>Loại</th><th>HKD</th><th>NPP</th>
-  </tr></thead><tbody>`;
-
-  items.forEach((p, i) => {
-    html += `<tr>
-      <td>${i + 1}</td><td>${p.ten}</td><td>${p.dvt}</td><td>${p.sl}</td>
-      <td>${p.gia}</td><td>${p.ck}</td><td>${p.thue}</td><td>${p.tt}</td>
-      <td>${p.loai}</td><td>${p.hkd}</td><td>${p.npp}</td>
-    </tr>`;
-  });
-
-  html += '</tbody></table>';
-  output.innerHTML = html;
-}
 
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  document.getElementById('status').innerText = '📥 Đang xử lý...';
+
+  const status = document.getElementById('status');
+  const canvas = document.getElementById('pdfCanvas');
+  const ctx = canvas.getContext('2d');
+  const output = document.getElementById('output');
+
+  status.innerText = '📥 Đang load PDF...';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let allLines = [];
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2.0 });
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const lines = groupTextByY(content.items).map(removeVN);
-    allLines.push(...lines);
-  }
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
 
-  const blocks = parseInvoiceBlocks(allLines);
-  for (const block of blocks) {
-    const parsed = extractDataFromBlock(block);
-    if (parsed.HKD && parsed.data.length > 0) {
-      if (!hkdData[parsed.HKD]) hkdData[parsed.HKD] = [];
-      hkdData[parsed.HKD].push(...parsed.data);
-    }
-  }
+  await page.render({ canvasContext: ctx, viewport }).promise;
 
-  displayHKDList();
-  document.getElementById('status').innerText = `✅ Đã xử lý ${blocks.length} hóa đơn`;
+  status.innerText = '🔍 Đang OCR...';
+
+  const result = await Tesseract.recognize(canvas.toDataURL(), 'vie', {
+    logger: m => console.log(m)
+  });
+
+  const lines = groupByLines(result.data.words);
+  const parsedRows = lines.map(parseRowByX);
+  displayTable(parsedRows);
+  status.innerText = `✅ Đã trích xuất ${parsedRows.length} dòng`;
 });
+
+// Gom từ theo y gần nhau
+function groupByLines(words) {
+  const lines = {};
+  for (let w of words) {
+    const y = Math.round(w.bbox.y0 / 5) * 5;
+    if (!lines[y]) lines[y] = [];
+    lines[y].push(w);
+  }
+
+  const sortedY = Object.keys(lines).sort((a, b) => a - b);
+  return sortedY.map(y => lines[y].sort((a, b) => a.bbox.x0 - b.bbox.x0));
+}
+
+// Chia theo x để tách cột
+function parseRowByX(words) {
+  const row = ['', '', '', '', '', '', '', ''];
+  for (let w of words) {
+    const x = w.bbox.x0;
+
+    if (x < 40) row[0] += ' ' + w.text;         // STT
+    else if (x < 160) row[1] += ' ' + w.text;   // Tính chất / loại
+    else if (x < 330) row[2] += ' ' + w.text;   // Tên hàng
+    else if (x < 400) row[3] += ' ' + w.text;   // ĐVT
+    else if (x < 470) row[4] += ' ' + w.text;   // SL
+    else if (x < 570) row[5] += ' ' + w.text;   // Đơn giá
+    else if (x < 630) row[6] += ' ' + w.text;   // Chiết khấu
+    else row[7] += ' ' + w.text;                // Thành tiền
+  }
+  return row.map(c => c.trim());
+}
+
+// Hiển thị bảng kết quả
+function displayTable(rows) {
+  let html = `<table><thead><tr>
+    <th>STT</th><th>Tính chất</th><th>Tên hàng</th><th>ĐVT</th>
+    <th>Số lượng</th><th>Đơn giá</th><th>Chiết khấu</th><th>Thành tiền</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach(r => {
+    if (r.filter(Boolean).length >= 5) {
+      html += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>';
+    }
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('output').innerHTML = html;
+}
 </script>
 </body>
 </html>
