@@ -2,144 +2,122 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>PDF ➜ Bảng kê hàng hóa</title>
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
+  <title>📦 Phân tích bảng kê từ văn bản</title>
   <style>
     body { font-family: Arial; padding: 20px; }
     textarea {
       width: 100%; height: 300px;
       font-family: monospace; white-space: pre-wrap;
-      margin-bottom: 20px; padding: 10px; border: 1px solid #ccc;
+      padding: 10px; margin-bottom: 20px;
+      border: 1px solid #ccc;
     }
     table { border-collapse: collapse; width: 100%; font-size: 13px; }
-    th, td { border: 1px solid #ccc; padding: 4px; }
+    th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }
     input { width: 100%; border: none; background: transparent; }
     input:focus { background: #eef; outline: 1px solid #00f; }
-    button { margin-top: 10px; }
+    button { margin: 10px 0; }
+    .center { text-align: center; }
   </style>
 </head>
 <body>
 
-<h3>📂 Chọn PDF ➜ Hiển thị văn bản & bảng kê</h3>
-<input type="file" id="pdfInput" accept="application/pdf">
-<div id="status">Chưa xử lý</div>
+<h3>📄 Văn bản từ PDF (dạng text)</h3>
+<textarea id="pdfTextArea" placeholder="Dán nội dung PDF đã chuyển thành văn bản tại đây..."></textarea>
 
-<h4>📄 Văn bản từ PDF</h4>
-<textarea id="pdfTextArea" placeholder="Toàn bộ văn bản sẽ hiển thị ở đây..."></textarea>
-
-<h4>📊 Bảng kê hàng hóa</h4>
+<button onclick="parseAndRender()">🚀 Phân tích & Tạo bảng kê</button>
 <div id="tableContainer"></div>
-<button onclick="addRow()">➕ Thêm dòng</button>
 
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
+function parseAndRender() {
+  const rawText = document.getElementById('pdfTextArea').value;
+  const lines = rawText.split('\n').map(line => line.trim()).filter(Boolean);
 
-function removeVN(str) {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
-}
-
-function groupLinesByY(items) {
-  const lines = {};
-  for (const item of items) {
-    const y = Math.round(item.transform[5]);
-    const x = item.transform[4];
-    if (!lines[y]) lines[y] = [];
-    lines[y].push({ x, str: item.str });
-  }
-  const sortedY = Object.keys(lines).sort((a, b) => b - a);
-  return sortedY.map(y =>
-    lines[y].sort((a, b) => a.x - b.x).map(t => t.str).join(' ')
-  );
-}
-
-document.getElementById('pdfInput').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const status = document.getElementById('status');
-  status.innerText = '📥 Đang xử lý...';
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let allLines = [];
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const lines = groupLinesByY(content.items);
-    const cleaned = lines.filter(line => !/^trang\s*\d+$/i.test(removeVN(line)));
-    allLines.push(...cleaned);
-  }
-
-  document.getElementById('pdfTextArea').value = allLines.join('\n');
-
-  const blocks = [];
+  const rows = [];
   let buffer = [];
 
-  for (const line of allLines) {
-    const noAccent = removeVN(line);
-    if (/hang hoa|chiet khau/.test(noAccent)) {
-      if (buffer.length) blocks.push(buffer);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\d+\s/.test(line)) {
+      if (buffer.length) rows.push(buffer.join(' '));
       buffer = [line];
-    } else {
+    } else if (buffer.length) {
       buffer.push(line);
     }
   }
-  if (buffer.length) blocks.push(buffer);
+  if (buffer.length) rows.push(buffer.join(' '));
 
-  const rows = [];
-  for (const block of blocks) {
-    const text = block.join(' ');
-    const parts = text.match(/^(.*?)\s+(Chai|Tui|Day|Hop|Tep|Kg|ml|l|lit|Túi|Dây)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)$/i);
+  const products = [];
+
+  for (const line of rows) {
+    const cleaned = line.replace(/\s+/g, ' ');
+    const parts = cleaned.match(/^(\d+)\s+(Hàng|Chiết)\s+(.*?)\s+(Chai|Túi|Dây|Kg|ml|L|Thùng|Hộp)?\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)\s+(\d{1,3}%|\d{1,2},?\d{0,2}%)\s+([\d.,]+)$/i);
+
     if (parts) {
-      rows.push({
-        ten: parts[1].replace(/^(\d+)?\s*(Hàng)?/i, '').trim(),
-        dvt: parts[2],
-        sl: parts[3],
-        gia: parts[4],
-        tt: parts[5]
+      products.push({
+        stt: parts[1],
+        loai: parts[2] === 'Hàng' ? 'Hàng hóa' : 'Chiết khấu',
+        ten: parts[3].trim(),
+        dvt: parts[4] || '',
+        sl: parts[5],
+        gia: parts[6],
+        ck: parts[7],
+        thue: parts[8],
+        tt: parts[9]
       });
     }
   }
 
-  renderTable(rows);
-  status.innerText = `✅ Đã nhận ${rows.length} dòng hàng hóa`;
-});
+  renderTable(products);
+}
 
 function renderTable(data) {
-  let html = `<table id="bangKe"><thead>
-    <tr><th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th></tr>
-  </thead><tbody>`;
+  let html = `<table id="bangKe"><thead><tr>
+    <th>STT</th><th>Loại</th><th>Tên hàng</th><th>ĐVT</th>
+    <th>Số lượng</th><th>Đơn giá</th><th>Chiết khấu</th><th>Thuế</th><th>Thành tiền</th>
+  </tr></thead><tbody>`;
+
+  let totalSL = 0, totalTT = 0;
 
   data.forEach((p, i) => {
+    const sl = parseFloat(p.sl.replace(',', '.')) || 0;
+    const tt = parseFloat(p.tt.replace(',', '.')) || 0;
+    totalSL += sl;
+    totalTT += tt;
+
     html += `<tr>
-      <td>${i+1}</td>
+      <td class="center">${i + 1}</td>
+      <td>${p.loai}</td>
       <td><input value="${p.ten}"></td>
       <td><input value="${p.dvt}"></td>
       <td><input class="sl" value="${p.sl}" oninput="updateTotal()"></td>
       <td><input class="dg" value="${p.gia}" oninput="updateTotal()"></td>
+      <td><input class="ck" value="${p.ck}"></td>
+      <td><input value="${p.thue}"></td>
       <td><input class="tt" value="${p.tt}" readonly></td>
     </tr>`;
   });
 
   html += `<tr>
-    <td colspan="3"><b>Tổng</b></td>
-    <td id="tongSL"></td><td></td><td id="tongTT"></td>
+    <td colspan="4"><b>Tổng</b></td>
+    <td class="center" id="tongSL">${totalSL}</td>
+    <td></td><td></td><td></td>
+    <td class="center" id="tongTT">${totalTT.toLocaleString()}</td>
   </tr></tbody></table>`;
 
+  html += `<button onclick="addRow()">➕ Thêm dòng</button>`;
   document.getElementById('tableContainer').innerHTML = html;
-  updateTotal();
 }
 
 function updateTotal() {
   const rows = document.querySelectorAll('#bangKe tbody tr');
   let totalSL = 0, totalTT = 0;
 
-  rows.forEach((row, i) => {
+  rows.forEach(row => {
     const sl = parseFloat(row.querySelector('.sl')?.value.replace(',', '.')) || 0;
     const dg = parseFloat(row.querySelector('.dg')?.value.replace(',', '.')) || 0;
-    const tt = sl * dg;
+    const ck = parseFloat(row.querySelector('.ck')?.value.replace(',', '.')) || 0;
+    const tt = sl * dg + ck;
+
     const ttCell = row.querySelector('.tt');
     if (ttCell) ttCell.value = tt.toFixed(0);
     totalSL += sl;
@@ -154,15 +132,17 @@ function addRow() {
   const table = document.querySelector('#bangKe tbody');
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td>#</td>
+    <td class="center">#</td>
+    <td><input value="Hàng hóa"></td>
     <td><input></td>
     <td><input></td>
     <td><input class="sl" value="0" oninput="updateTotal()"></td>
     <td><input class="dg" value="0" oninput="updateTotal()"></td>
+    <td><input class="ck" value="0"></td>
+    <td><input value="10%"></td>
     <td><input class="tt" readonly></td>
   `;
   table.insertBefore(tr, table.lastElementChild);
-  updateTotal();
 }
 </script>
 </body>
