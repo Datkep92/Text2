@@ -2,14 +2,14 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Trích hóa đơn ➜ Phân theo HKD</title>
+  <title>Trích hóa đơn ➜ Phân HKD & NPP</title>
   <style>
     body { font-family: Arial; display: flex; padding: 20px; gap: 20px; }
-    #left { width: 200px; }
+    #left { width: 220px; }
     #left ul { list-style: none; padding: 0; }
     #left li { cursor: pointer; margin: 5px 0; color: blue; text-decoration: underline; }
     #right { flex: 1; }
-    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
     th, td { border: 1px solid #ccc; padding: 5px; font-size: 13px; }
     input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
     .center { text-align: center; }
@@ -60,7 +60,7 @@ function parseInvoiceBlocks(lines) {
   const blocks = [];
   let block = [];
   for (const line of lines) {
-    if (/^mau so|^ky hieu|^so:|^hoa don gia tri/i.test(line) && block.length) {
+    if (/^mau so|^ky hieu|^so:|^hoa don gia tri/i.test(removeVN(line)) && block.length) {
       blocks.push(block);
       block = [];
     }
@@ -72,12 +72,8 @@ function parseInvoiceBlocks(lines) {
 
 function getHKD(block) {
   for (let i = 0; i < block.length; i++) {
-    const line = removeVN(block[i]);
-    if (/ten nguoi mua/.test(line)) {
-      const next = block[i + 1]?.trim() || '';
-      if (next && !/ma so thue|dia chi/i.test(removeVN(next))) {
-        return next;
-      }
+    if (/ten nguoi mua/.test(removeVN(block[i]))) {
+      return block[i + 1]?.trim() || 'HKD không rõ';
     }
   }
   return 'HKD không rõ';
@@ -85,10 +81,8 @@ function getHKD(block) {
 
 function getNPP(block) {
   for (let i = 0; i < block.length; i++) {
-    const line = removeVN(block[i]);
-    if (/ten nguoi ban/.test(line)) {
-      const next = block[i + 1]?.trim() || '';
-      return next;
+    if (/ten nguoi ban/.test(removeVN(block[i]))) {
+      return block[i + 1]?.trim() || 'NPP không rõ';
     }
   }
   return 'NPP không rõ';
@@ -99,32 +93,34 @@ function extractDataFromBlock(block) {
   const NPP = getNPP(block);
   const data = [];
 
-  const start = block.findIndex(l => /hang hoa, dich vu/i.test(removeVN(l)));
+  const start = block.findIndex(l => /hang hoa, dich vu/.test(removeVN(l)));
   if (start === -1) return { HKD, NPP, data };
 
   for (let i = start + 1; i < block.length; i++) {
     const line = block[i];
-    if (/^tong|^thue|^tong tien|^chu ky/i.test(removeVN(line))) break;
+    if (/^tong|^thue|^tong tien|^chu ky/.test(removeVN(line))) break;
 
     const parts = line.trim().split(/\s+/);
     if (parts.length < 6) continue;
 
     const last = parts.slice(-6);
+    if (!last[0] || !isNaN(last[0]) === false) continue; // không có DVT thì bỏ
+
     let name = parts.slice(0, parts.length - 6).join(' ');
     name = name.replace(/^\d+\s*/g, '').replace(/^hang\s*/i, '');
 
-    const slRaw = last[1].replace(',', '.');
-    const sl = Number(slRaw);
-    if (!Number.isFinite(sl)) continue;
+    const sl = parseFloat(last[1].replace(',', '.')) || 0;
+    const giaRaw = last[2].replace(/\./g, '').replace(',', '.');
+    const gia = parseFloat(giaRaw) || 0;
 
     data.push({
       ten: name,
       dvt: last[0],
-      sl: sl,
-      gia: parseFloat(last[2].replace(',', '.')),
-      ck: parseFloat(last[3].replace(',', '.')),
+      sl,
+      gia,
+      ck: last[3],
       thue: last[4],
-      tt: parseFloat(last[5].replace(',', '.')),
+      tt: gia * sl,
       loai: 'Hàng hóa',
       hkd: HKD,
       npp: NPP
@@ -157,7 +153,7 @@ function showTableFor(hkd) {
   let html = `<button onclick="addRow()">➕ Thêm hàng thủ công</button>
   <table id="itemTable"><thead><tr>
     <th>STT</th><th>Tên hàng</th><th>ĐVT</th><th>Số lượng</th>
-    <th>Đơn giá</th><th>Chiết khấu</th><th>Thuế</th><th>Thành tiền</th>
+    <th>Đơn giá</th><th>Chiết khấu</th><th>Thuế suất</th><th>Thành tiền</th>
     <th>Loại</th><th>HKD</th><th>NPP</th><th></th>
   </tr></thead><tbody>`;
 
@@ -167,10 +163,10 @@ function showTableFor(hkd) {
       <td><input value="${p.ten}"></td>
       <td><input value="${p.dvt}"></td>
       <td><input class="sl" type="number" value="${p.sl}" oninput="updateTotals()"></td>
-      <td><input class="dg" type="number" value="${p.gia}" oninput="updateTotals()"></td>
+      <td><input class="dg" type="text" value="${p.gia.toLocaleString('vi-VN')}" oninput="updateTotals()"></td>
       <td><input value="${p.ck}"></td>
       <td><input value="${p.thue}"></td>
-      <td><input class="tt" type="number" value="${p.tt}" readonly></td>
+      <td><input class="tt" type="text" value="${p.tt.toLocaleString('vi-VN')}" readonly></td>
       <td><input value="${p.loai}"></td>
       <td><input value="${p.hkd}"></td>
       <td><input value="${p.npp}"></td>
@@ -182,7 +178,7 @@ function showTableFor(hkd) {
     <tfoot><tr>
       <td colspan="3"><b>Tổng</b></td>
       <td id="totalQty" class="center">0</td>
-      <td colspan="3"></td>
+      <td></td><td></td><td></td>
       <td id="totalAmt" class="center">0</td>
       <td colspan="4"></td>
     </tr></tfoot>
@@ -198,9 +194,9 @@ function addRow() {
     <td class="center">#</td>
     <td><input></td><td><input></td>
     <td><input class="sl" type="number" value="0" oninput="updateTotals()"></td>
-    <td><input class="dg" type="number" value="0" oninput="updateTotals()"></td>
+    <td><input class="dg" type="text" value="0" oninput="updateTotals()"></td>
     <td><input></td><td><input></td>
-    <td><input class="tt" type="number" value="0" readonly></td>
+    <td><input class="tt" type="text" value="0" readonly></td>
     <td><input></td><td><input value="${currentHKD}"></td><td><input></td>
     <td><button class="btn-small" onclick="this.closest('tr').remove(); updateTotals()">❌</button></td>`;
   tbody.appendChild(tr);
@@ -212,14 +208,15 @@ function updateTotals() {
   document.querySelectorAll('#itemTable tbody tr').forEach((row, i) => {
     row.children[0].innerText = i + 1;
     const sl = parseFloat(row.querySelector('.sl')?.value) || 0;
-    const dg = parseFloat(row.querySelector('.dg')?.value) || 0;
+    const dgRaw = row.querySelector('.dg')?.value || '0';
+    const dg = parseFloat(dgRaw.replaceAll('.', '').replace(',', '.')) || 0;
     const tt = sl * dg;
-    row.querySelector('.tt').value = tt.toFixed(0);
+    row.querySelector('.tt').value = tt.toLocaleString('vi-VN');
     totalQty += sl;
     totalAmt += tt;
   });
   document.getElementById('totalQty').innerText = totalQty;
-  document.getElementById('totalAmt').innerText = totalAmt.toLocaleString();
+  document.getElementById('totalAmt').innerText = totalAmt.toLocaleString('vi-VN');
 }
 
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
@@ -250,9 +247,8 @@ document.getElementById('pdfInput').addEventListener('change', async (e) => {
   }
 
   displayHKDList();
-  status.innerText = `✅ Đã xử lý ${blocks.length} hóa đơn / ${Object.keys(hkdData).length} HKD`;
+  status.innerText = `✅ Xử lý xong ${blocks.length} hóa đơn`;
 });
 </script>
-
 </body>
 </html>
