@@ -5,65 +5,74 @@
   <title>Quản lý Hộ Kinh Doanh</title>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
   <style>
-    body { font-family: Arial; padding: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #999; padding: 6px; text-align: left; font-size: 14px; }
-    th { background-color: #eee; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
+    .container { display: flex; width: 100%; }
+    .sidebar { width: 250px; background: #f4f4f9; padding: 10px; overflow-y: auto; border-right: 1px solid #ddd; }
+    .main-content { flex: 1; padding: 10px; overflow-y: auto; }
+    .sidebar h3, .main-content h3 { margin: 10px 0; font-size: 16px; }
+    .sidebar ul { list-style: none; padding: 0; }
+    .sidebar li { padding: 8px; margin: 4px 0; background: #fff; border: 1px solid #ddd; cursor: pointer; }
+    .sidebar li:hover { background: #e0e0ff; }
+    .sidebar li.active { background: #d0d0ff; font-weight: bold; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    th { background: #eee; }
     td[contenteditable="true"] { background: #fffced; }
-    button { padding: 8px 12px; margin: 10px 5px; }
-    #summary { font-weight: bold; margin-top: 15px; padding: 10px; background: #f9f9f9; border: 1px solid #ccc; white-space: pre-line; }
-    #pdfTextArea, #status { display: none; }
-    .tabs { margin-bottom: 20px; }
-    .tabs button { margin-right: 10px; }
-    .tab { display: none; }
-    .tab.active { display: block; }
-    #businessList { margin-top: 20px; }
-    #businessList ul { list-style: none; padding: 0; }
-    #businessList li { padding: 10px; border: 1px solid #ddd; margin-bottom: 5px; cursor: pointer; }
-    #businessList li:hover { background: #f0f0f0; }
-    #businessDetails { margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; }
-    #invoiceInfo { border: 1px dashed #999; padding: 10px; margin-top: 15px; background: #f3f3f3; white-space: pre-line; }
-    #searchContainer { margin-bottom: 20px; }
-    #searchInput { padding: 8px; width: 300px; }
-    #searchResults { margin-top: 10px; }
+    button { padding: 6px 12px; margin: 5px; cursor: pointer; font-size: 14px; }
+    #summary { margin: 10px 0; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; font-size: 14px; }
+    #pdfTextArea, .hidden { display: none; }
+    #searchContainer { margin: 10px 0; }
+    #searchInput { padding: 8px; width: 100%; box-sizing: border-box; font-size: 14px; }
+    #searchResults { margin-top: 10px; font-size: 14px; }
+    .business-details { background: #fff; padding: 10px; border: 1px solid #ddd; }
+    #invoiceInfo { border: 1px dashed #999; padding: 10px; margin: 10px 0; background: #fff; font-size: 14px; }
+    .toggle-section { display: none; }
+    .toggle-section.active { display: block; }
+    .notification { position: fixed; top: 10px; right: 10px; padding: 10px; background: #f00; color: #fff; display: none; z-index: 1000; }
   </style>
 </head>
 <body>
-  <div id="searchContainer">
-    <input type="text" id="searchInput" placeholder="Tìm kiếm hóa đơn, HKD, nhà phân phối...">
-    <div id="searchResults"></div>
-  </div>
-
-  <div class="tabs">
-    <button onclick="showTab('invoices')">Nhập Hóa đơn</button>
-    <button onclick="showTab('business')">Hộ Kinh Doanh</button>
-  </div>
-
-  <div id="invoices" class="tab active">
-    <h3>📂 Nhập Hóa đơn</h3>
-    <button onclick="document.getElementById('pdfInput').click()">📥 Chọn File Hóa đơn</button>
-    <input type="file" id="pdfInput" accept="application/pdf" multiple style="display: none;">
-    <div id="status">Chưa xử lý</div>
-    <div id="invoiceInfo">🧾 Thông tin hóa đơn sẽ hiển thị tại đây sau khi upload...</div>
-    <textarea id="pdfTextArea"></textarea>
-    <div id="tableResult"></div>
-    <div id="summary">
-      Tổng: <span id="totalQty">0</span> sản phẩm |
-      Tổng số tiền: <span id="totalMoney">0</span><br>
-      🧾 Tổng chiết khấu: <span id="totalDiscount">0</span><br>
-      💰 Tổng sau chiết khấu: <span id="netTotal" contenteditable="true" oninput="manualNetEdit=true">0</span>
+  <div class="container">
+    <div class="sidebar">
+      <h3>📋 Hộ Kinh Doanh</h3>
+      <button onclick="createManualBusiness()">➕ Tạo HKD</button>
+      <div id="businessList"></div>
     </div>
-  </div>
-
-  <div id="business" class="tab">
-    <h3>📋 Danh sách Hộ Kinh Doanh</h3>
-    <button onclick="createManualBusiness()">➕ Tạo Hộ Kinh Doanh</button>
-    <button onclick="clearAllData()">🗑️ Xóa Toàn Bộ Dữ Liệu</button>
-    <div id="businessList"></div>
-    <div id="businessDetails">
-      <h4>Chi tiết Hộ Kinh Doanh</h4>
-      <div id="inventoryTable"></div>
-      <div id="invoiceHistory"></div>
+    <div class="main-content">
+      <div id="searchContainer">
+        <input id="searchInput" placeholder="Tìm hóa đơn, HKD, nhà cung cấp, MST...">
+        <div id="searchResults"></div>
+      </div>
+      <div>
+        <button onclick="document.getElementById('pdfInput').click()">📩 Thêm Hóa đơn</button>
+        <button onclick="clearAllData()">🗑️ Xóa Dữ liệu</button>
+        <button onclick="toggleDuplicateCheck()">🔄 <span id="duplicateStatus">Tắt Trùng Hóa đơn: BẬT</span></button>
+        <input type="file" id="pdfInput" accept="application/pdf" multiple class="hidden">
+      </div>
+      <div id="invoices">
+        <h3>📅 Nhập Hóa đơn</h3>
+        <div id="status" class="hidden">Chưa xử lý</div>
+        <div id="invoiceInfo">📜 Thông tin hóa đơn sẽ hiển thị tại đây...</div>
+        <textarea id="pdfTextArea" class="hidden"></textarea>
+        <div id="tableResult"></div>
+        <div id="summary">
+          Tổng: <span id="totalQty">0</span> sản phẩm | Tổng số tiền: <span id="totalMoney">0</span><br/>
+          🟢 Tổng chiết khấu: <span id="totalDiscount">0</span><br/>
+          💵 Tổng sau chiết khấu: <span id="netTotal" contenteditable="true" oninput="manualNetEdit=true">0</span>
+        </div>
+      </div>
+      <div id="details" class="business-details">
+        <h4>Chi tiết Hộ Kinh Doanh</h4>
+        <div id="inventorySummary"></div>
+        <div id="inventoryTable"></div>
+        <div id="latestInvoiceTable" class="toggle-section">
+          <h4>Hóa đơn gần nhất</h4>
+        </div>
+        <button onclick="toggleLatestInvoice()">📄 Xem Hóa đơn Gần nhất</button>
+        <div id="invoiceHistory"></div>
+        <div id="revenueReport"></div>
+        <div id="taxReport"></div>
+      </div>
     </div>
   </div>
 
@@ -74,6 +83,7 @@ let businesses = JSON.parse(localStorage.getItem('businesses')) || [];
 let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
 let inventory = JSON.parse(localStorage.getItem('inventory')) || [];
 let manualNetEdit = false;
+let allowDuplicates = false;
 
 function normalizeNumber(str) {
   if (!str) return 0;
@@ -81,93 +91,121 @@ function normalizeNumber(str) {
   return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
 }
 
-function showTab(tabId) {
-  document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-  document.getElementById(tabId).classList.add('active');
+function showNotification(message) {
+  const notif = document.createElement('div');
+  notif.className = 'notification';
+  notif.innerText = message;
+  document.body.appendChild(notif);
+  notif.style.display = 'block';
+  setTimeout(() => notif.remove(), 3000);
 }
 
 function extractInvoiceInfo(text) {
-  const dateMatch = text.match(/Ngày[:\s]*(\d{2}) tháng (\d{2}) năm (\d{4})/i);
+  const dateMatch = text.match(/Ngày[:\s]*(\d{2})[\/\-\s]*tháng[\/\-\s]*(\d{2})[\/\-\s]*năm[\/\-\s]*(\d{4})|(\d{2})[\/\-](\d{2})[\/\-](\d{4})/i);
+  const totalVatMatch = text.match(/Tổng tiền thuế GTGT[:\s]+([\d,.]+)/i);
   return {
-    mccqt: (text.match(/MCCQT[:\s]*([A-Z0-9]+)/i) || [])[1] || 'Không rõ',
+    mccqt: (text.match(/MCCQT[:\s]*([A-Z0-9]+)/i) || [])[1] || prompt('Nhập MCCQT thủ công:') || 'Không rõ',
     so: (text.match(/Số[:\s]+(\d{3,})/i) || [])[1] || 'Không rõ',
     kyhieu: (text.match(/Ký hiệu[:\s]+([A-Z0-9\/]+)/i) || [])[1] || 'Không rõ',
-    date: dateMatch ? `Ngày ${dateMatch[1]} tháng ${dateMatch[2]} năm ${dateMatch[3]}` : 'Không rõ',
+    date: dateMatch ? (dateMatch[1] ? `Ngày ${dateMatch[1]} tháng ${dateMatch[2]} năm ${dateMatch[3]}` : `Ngày ${dateMatch[4]} tháng ${dateMatch[5]} năm ${dateMatch[6]}`) : 'Không rõ',
     tenBan: (text.match(/Tên người bán[:\s]+([^\n]+)/i) || [])[1] || 'Không rõ',
     mstBan: (text.match(/Mã số thuế[:\s]+(\d{8,15})/i) || [])[1] || 'Không rõ',
     diachiBan: (text.match(/Địa chỉ[:\s]+([^\n]+)/i) || [])[1] || 'Không rõ',
     tenMua: (text.match(/Tên người mua[:\s]+([^\n]+)/i) || [])[1] || 'Không rõ',
-    mstMua: (text.match(/Mã số thuế[:\s]+(\d{8,15})/gi) || []).slice(1).pop() || 'Không rõ',
-    diachiMua: (text.match(/Địa chỉ[:\s]+([^\n]+)/gi) || []).slice(1).pop() || 'Không rõ',
+    mstMua: (text.match(/Mã số thuế[:\s]+(\d{8,15})/gi) || []).slice(1).pop() || prompt('Nhập MST người mua:') || '0',
+    diachiMua: (text.match(/Địa chỉ[:\s]+([^\n]+)/gi) || []).slice(1).pop() || 'Không có',
+    totalVat: totalVatMatch ? normalizeNumber(totalVatMatch[1]) : 0
   };
 }
 
 document.getElementById('pdfInput').addEventListener('change', async (e) => {
-  const files = e.target.files;
+  const files = Array.from(e.target.files);
   if (!files.length) return;
   const status = document.getElementById('status');
+  if (!status) return showNotification('Không tìm thấy phần tử status');
 
   for (const file of files) {
-    status.innerText = `📥 Đang xử lý ${file.name}...`;
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let resultLines = [];
-    let fullText = '';
-    let direction = 'input';
+    try {
+      status.innerText = `📥 Đang xử lý ${file.name}...`;
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let resultLines = [];
+      let fullText = '';
+      let direction = 'input';
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const rawTexts = content.items.map(item => item.str.trim()).filter(t => t !== '');
-      fullText += rawTexts.join('\n') + '\n';
-      if (rawTexts.some(txt => txt.toLowerCase().includes('xuất kho'))) direction = 'output';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const rawTexts = content.items.map(item => item.str.trim()).filter(t => t !== '');
+        fullText += rawTexts.join('\n') + '\n';
+        if (rawTexts.some(txt => txt.toLowerCase().includes('xuất kho'))) direction = 'output';
 
-      let currentLine = '';
-      for (let txt of rawTexts) {
-        if (txt.includes('Thuế suất')) break;
-        currentLine += txt + ' ';
+        let currentLine = '';
+        for (let txt of rawTexts) {
+          if (txt.includes('Thuế suất')) break;
+          currentLine += txt + ' ';
+        }
+        const splitLines = currentLine.match(/(\d+\s+(Hàng hóa|Chiết khấu)[\s\S]*?)(?=\d+\s+(Hàng hóa|Chiết khấu)|$)/g);
+        if (splitLines) resultLines.push(...splitLines.map(s => s.trim()));
       }
-      const splitLines = currentLine.match(/(\d+\s+(Hàng hóa|Chiết khấu)[\s\S]*?)(?=\d+\s+(Hàng hóa|Chiết khấu)|$)/g);
-      if (splitLines) resultLines.push(...splitLines.map(s => s.trim()));
-    }
 
-    const info = extractInvoiceInfo(fullText);
-    if (info.mccqt === 'Không rõ') {
-      alert(`Không tìm thấy mã MCCQT trong ${file.name}`);
-      continue;
-    }
-    if (invoices.some(inv => inv.mccqt === info.mccqt)) {
-      alert(`Hóa đơn với mã MCCQT ${info.mccqt} đã tồn tại`);
-      continue;
-    }
-    if (info.mstMua === 'Không rõ') {
-      alert(`Không tìm thấy MST người mua trong ${file.name}`);
-      continue;
-    }
+      const info = extractInvoiceInfo(fullText);
+      if (info.mccqt === 'Không rõ') {
+        showNotification(`Không tìm thấy mã MCCQT trong ${file.name}`);
+        continue;
+      }
+      if (!allowDuplicates && invoices.some(inv => inv.mccqt === info.mccqt)) {
+        showNotification(`Hóa đơn với mã MCCQT ${info.mccqt} đã tồn tại`);
+        continue;
+      }
+      if (info.mstMua === '0') {
+        showNotification(`Không tìm thấy MST người mua trong ${file.name}`);
+        continue;
+      }
 
-    let business = businesses.find(b => b.taxCode === info.mstMua && b.name === info.tenMua);
-    if (!business) {
-      business = {
-        id: crypto.randomUUID(),
-        name: info.tenMua,
-        taxCode: info.mstMua,
-        address: info.diachiMua
-      };
-      businesses.push(business);
-      localStorage.setItem('businesses', JSON.stringify(businesses));
-    }
+      let business = businesses.find(b => b.taxCode === info.mstMua && b.name === info.tenMua);
+      let businessId;
+      if (!business) {
+        business = {
+          id: crypto.randomUUID(),
+          name: info.tenMua,
+          taxCode: info.mstMua,
+          address: info.diachiMua
+        };
+        businesses.push(business);
+        businessId = business.id;
+      } else {
+        businessId = business.id;
+      }
 
-    document.getElementById('pdfTextArea').value = resultLines.join('\n');
-    parseToTable(business.id, file, info, direction);
-    status.innerText = `✅ Đã xử lý ${file.name}`;
-    updateBusinessList();
+      const pdfTextArea = document.getElementById('pdfTextArea');
+      if (!pdfTextArea) return showNotification('Không tìm thấy phần tử pdfTextArea');
+      pdfTextArea.value = resultLines.join('\n');
+
+      const success = parseToTable(businessId, file, info, direction);
+      if (success) {
+        status.innerText = `✅ Đã xử lý ${file.name}`;
+        moveBusinessToTop(businessId);
+        updateBusinessList(businessId);
+        showBusinessDetails(businessId);
+      } else {
+        status.innerText = `❌ Lỗi xử lý ${file.name}`;
+      }
+    } catch (error) {
+      console.error(`Lỗi xử lý ${file.name}:`, error);
+      showNotification(`Lỗi khi xử lý ${file.name}: ${error.message}`);
+      status.innerText = `❌ Lỗi xử lý ${file.name}`;
+    }
   }
 });
 
 function parseToTable(businessId, file, info, direction) {
-  const rawText = document.getElementById('pdfTextArea').value.trim();
+  const pdfTextArea = document.getElementById('pdfTextArea');
+  if (!pdfTextArea) return false;
+  const rawText = pdfTextArea.value.trim();
   const lines = rawText.split('\n').filter(line => line.trim() !== '');
   const rows = [];
+  const uploadDate = new Date().toISOString();
   const invoice = {
     id: crypto.randomUUID(),
     businessId,
@@ -178,36 +216,40 @@ function parseToTable(businessId, file, info, direction) {
     seller: { name: info.tenBan, taxCode: info.mstBan, address: info.diachiBan },
     file: URL.createObjectURL(file),
     items: [],
-    direction
+    direction,
+    uploadDate,
+    netTotal: 0,
+    totalVat: info.totalVat
   };
 
   for (const line of lines) {
     const tokens = line.trim().split(/\s+/);
+    if (tokens.length < 5) continue;
     const stt = tokens.shift();
-    const typeToken = tokens.slice(0, 3).join(' ');
+    const typeToken = tokens.slice(0, 2).join(' ');
     const isDiscount = /Chiết khấu/i.test(typeToken);
     let type = isDiscount ? 'Chiết khấu thương mại' : 'Hàng hóa, dịch vụ';
-    tokens.splice(0, 3);
+    tokens.splice(0, 2);
 
-    let name = '', qty = '', price = '', discount = '0', vat = '0', total = '0', unit = '';
+    let name = '', qty = '', price = '', discount = '0', vat = '0', total = '0', unit = '', vatAmount = 0;
 
     if (isDiscount) {
-      total = tokens.pop();
-      vat = tokens.pop();
+      total = tokens.pop() || '0';
+      vat = tokens.pop() || '0';
       const lastThree = tokens.splice(-3);
       discount = lastThree[0] || '0';
       price = lastThree[1] || '0';
-      qty = lastThree[2] || '';
+      qty = lastThree[2] || '0';
       name = tokens.join(' ');
     } else {
-      const reversed = [...tokens].reverse();
+      const reversed = tokens.reverse();
       total = reversed.shift() || '0';
       vat = reversed.shift() || '0';
       discount = reversed.shift() || '0';
       price = reversed.shift() || '0';
       qty = reversed.shift() || '0';
       for (let i = 0; i < reversed.length; i++) {
-        if (/[a-zA-ZÀ-Ỵà-ỵ]+/.test(reversed[i])) {
+        if (/[a-zA-ZÀ-Ỵ]+/.test(reversed[i])) {
           unit = reversed[i];
           reversed.splice(i, 1);
           break;
@@ -217,17 +259,27 @@ function parseToTable(businessId, file, info, direction) {
     }
 
     name = name.replace(/^mại\s*/i, '').replace(/^vụ\s*/i, '');
+    const vatRate = normalizeNumber(vat.replace('%', '')) / 100;
+    const totalNum = normalizeNumber(total);
+    const baseAmount = normalizeNumber(qty) * normalizeNumber(price) - normalizeNumber(discount);
+    vatAmount = baseAmount * vatRate;
+
     rows.push({ stt, type, name, unit, qty, price, discount, vat, total });
-    invoice.items.push({ stt, type, name, unit, qty, price, discount, vat, total });
+    invoice.items.push({ stt, type, name, unit, qty, price, discount, vat, total, vatAmount });
     if (type === 'Hàng hóa, dịch vụ') {
-      updateInventory(businessId, { stt, type, name, unit, qty, price, discount, vat, total }, direction);
+      updateInventory(businessId, { stt, type, name, unit, qty, price, discount, vat, total, vatAmount }, direction);
+    }
+    if (direction === 'output' && type === 'Hàng hóa, dịch vụ') {
+      invoice.netTotal += totalNum;
     }
   }
 
   invoices.push(invoice);
   localStorage.setItem('invoices', JSON.stringify(invoices));
 
-  document.getElementById('invoiceInfo').innerText =
+  const invoiceInfo = document.getElementById('invoiceInfo');
+  if (!invoiceInfo) return false;
+  invoiceInfo.innerText =
 `🧾 HÓA ĐƠN: ${info.kyhieu} - ${info.so}
 🔐 Mã MCCQT: ${info.mccqt}
 📅 Ngày: ${info.date}
@@ -240,7 +292,11 @@ function parseToTable(businessId, file, info, direction) {
 🏢 NGƯỜI BÁN:
 - Tên: ${info.tenBan}
 - MST: ${info.mstBan}
-- Địa chỉ: ${info.diachiBan}`;
+- Địa chỉ: ${info.diachiBan}
+💰 Tổng tiền thuế GTGT: ${formatMoney(info.totalVat)}`;
+
+  const tableResult = document.getElementById('tableResult');
+  if (!tableResult) return false;
 
   const headers = ['STT', 'Tính chất', 'Tên hàng hóa, dịch vụ', 'Đơn vị tính', 'Số lượng', 'Đơn giá', 'Chiết khấu', 'Thuế suất', 'Thành tiền'];
   let html = '<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
@@ -257,12 +313,13 @@ function parseToTable(businessId, file, info, direction) {
   }
 
   html += '</tbody></table><button onclick="addEmptyRow()">➕ Thêm sản phẩm</button>';
-  document.getElementById('tableResult').innerHTML = html;
+  tableResult.innerHTML = html;
 
   document.querySelectorAll('.qty, .price').forEach(span =>
     span.addEventListener('input', updateComputedTotals)
   );
   updateComputedTotals();
+  return true;
 }
 
 function updateInventory(businessId, item, direction) {
@@ -273,7 +330,11 @@ function updateInventory(businessId, item, direction) {
     invItem.price = item.price;
     invItem.discount = item.discount;
     invItem.vat = item.vat;
+    invItem.vatAmount = item.vatAmount;
     invItem.total = formatMoney(normalizeNumber(invItem.qty) * normalizeNumber(item.price));
+    if (invItem.qty <= 0) {
+      inventory = inventory.filter(i => i !== invItem);
+    }
   } else if (qtyChange > 0) {
     inventory.push({
       businessId,
@@ -285,18 +346,29 @@ function updateInventory(businessId, item, direction) {
       price: item.price,
       discount: item.discount,
       vat: item.vat,
+      vatAmount: item.vatAmount,
       total: formatMoney(qtyChange * normalizeNumber(item.price))
     });
   }
   localStorage.setItem('inventory', JSON.stringify(inventory));
 }
 
-function updateBusinessList() {
+function moveBusinessToTop(businessId) {
+  const index = businesses.findIndex(b => b.id === businessId);
+  if (index > -1) {
+    const [business] = businesses.splice(index, 1);
+    businesses.unshift(business);
+    localStorage.setItem('businesses', JSON.stringify(businesses));
+  }
+}
+
+function updateBusinessList(selectedId = null) {
   const businessList = document.getElementById('businessList');
+  if (!businessList) return;
   businessList.innerHTML = '<ul>' + businesses.map(b => `
-    <li onclick="showBusinessDetails('${b.id}')">
+    <li class="${b.id === selectedId ? 'active' : ''}" onclick="showBusinessDetails('${b.id}')">
       ${b.name} (MST: ${b.taxCode}) 
-      <button onclick="editBusinessName('${b.id}', event)">Sửa tên</button>
+      <button onclick="editBusinessName('${b.id}', event)">Sửa</button>
     </li>
   `).join('') + '</ul>';
   localStorage.setItem('businesses', JSON.stringify(businesses));
@@ -312,11 +384,12 @@ function createManualBusiness() {
       taxCode,
       address: prompt('Nhập địa chỉ (tùy chọn):') || ''
     };
-    businesses.push(newBusiness);
+    businesses.unshift(newBusiness);
     localStorage.setItem('businesses', JSON.stringify(businesses));
-    updateBusinessList();
+    updateBusinessList(newBusiness.id);
+    showBusinessDetails(newBusiness.id);
   } else {
-    alert('Tên hoặc MST không hợp lệ hoặc đã tồn tại!');
+    showNotification('Tên hoặc MST không hợp lệ hoặc đã tồn tại!');
   }
 }
 
@@ -327,7 +400,7 @@ function editBusinessName(businessId, event) {
   if (newName && newName !== business.name) {
     business.name = newName;
     localStorage.setItem('businesses', JSON.stringify(businesses));
-    updateBusinessList();
+    updateBusinessList(businessId);
     showBusinessDetails(businessId);
   }
 }
@@ -341,16 +414,112 @@ function clearAllData() {
     localStorage.setItem('invoices', JSON.stringify(invoices));
     localStorage.setItem('inventory', JSON.stringify(inventory));
     updateBusinessList();
-    document.getElementById('businessDetails').innerHTML = '<h4>Chi tiết Hộ Kinh Doanh</h4>';
-    alert('Đã xóa toàn bộ dữ liệu!');
+    const businessDetails = document.getElementById('details');
+    if (businessDetails) businessDetails.innerHTML = '<h4>Chi tiết Hộ Kinh Doanh</h4>';
+    showNotification('Đã xóa toàn bộ dữ liệu!');
   }
+}
+
+function toggleDuplicateCheck() {
+  allowDuplicates = !allowDuplicates;
+  const duplicateStatus = document.getElementById('duplicateStatus');
+  if (duplicateStatus) duplicateStatus.innerText = `Tắt Trùng Hóa đơn: ${allowDuplicates ? 'TẮT' : 'BẬT'}`;
+}
+
+function toggleLatestInvoice() {
+  const section = document.getElementById('latestInvoiceTable');
+  if (section) section.classList.toggle('active');
+}
+
+function generateTaxReport(invoices) {
+  const now = new Date();
+  const periods = [
+    { label: 'Tháng này', start: new Date(now.getFullYear(), now.getMonth(), 1), end: now },
+    { label: 'Quý này', start: new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1), end: now },
+    { label: 'Năm nay', start: new Date(now.getFullYear(), 0, 1), end: now }
+  ];
+
+  let html = '<h4>Báo cáo Thuế GTGT</h4>';
+  periods.forEach(period => {
+    const filtered = invoices.filter(i => new Date(i.uploadDate) >= period.start && new Date(i.uploadDate) <= period.end);
+    const taxSummary = {};
+
+    filtered.forEach(invoice => {
+      invoice.items.forEach(item => {
+        if (item.type !== 'Hàng hóa, dịch vụ') return;
+        const vatRate = item.vat || '0%';
+        if (!taxSummary[vatRate]) {
+          taxSummary[vatRate] = { baseAmount: 0, vatAmount: 0 };
+        }
+        const baseAmount = normalizeNumber(item.qty) * normalizeNumber(item.price) - normalizeNumber(item.discount);
+        taxSummary[vatRate].baseAmount += baseAmount;
+        taxSummary[vatRate].vatAmount += item.vatAmount || 0;
+      });
+    });
+
+    html += `<p>${period.label}:</p>`;
+    if (Object.keys(taxSummary).length === 0) {
+      html += '<p>Không có dữ liệu thuế.</p>';
+    } else {
+      html += '<table><thead><tr><th>Thuế suất</th><th>Giá trị trước thuế</th><th>Tiền thuế GTGT</th></tr></thead><tbody>';
+      for (const [vatRate, data] of Object.entries(taxSummary)) {
+        html += `<tr><td>${vatRate}</td><td>${formatMoney(data.baseAmount)}</td><td>${formatMoney(data.vatAmount)}</td></tr>`;
+      }
+      const totalBase = Object.values(taxSummary).reduce((sum, t) => sum + t.baseAmount, 0);
+      const totalVat = Object.values(taxSummary).reduce((sum, t) => sum + t.vatAmount, 0);
+      html += `<tr><td><b>Tổng</b></td><td><b>${formatMoney(totalBase)}</b></td><td><b>${formatMoney(totalVat)}</b></td></tr>`;
+      html += '</tbody></table>';
+    }
+  });
+
+  return html;
 }
 
 function showBusinessDetails(businessId) {
   const business = businesses.find(b => b.id === businessId);
   if (!business) return;
 
+  updateBusinessList(businessId);
+
+  const businessInvoices = invoices.filter(i => i.businessId === businessId);
+  const latestInvoice = businessInvoices.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate))[0];
+  const latestInvoiceTable = latestInvoice ? `
+    <table>
+      <thead>
+        <tr>
+          <th>STT</th><th>Tính chất</th><th>Tên hàng hóa, dịch vụ</th><th>Đơn vị tính</th>
+          <th>Số lượng</th><th>Đơn giá</th><th>Chiết khấu</th><th>Thuế suất</th><th>Thành tiền</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${latestInvoice.items.map(item => `
+          <tr>
+            <td>${item.stt}</td><td>${item.type}</td><td>${item.name}</td><td>${item.unit}</td>
+            <td>${item.qty}</td><td>${formatMoney(item.price)}</td><td>${formatMoney(item.discount)}</td>
+            <td>${item.vat}</td><td>${formatMoney(item.total)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  ` : '<p>Chưa có hóa đơn nào.</p>';
+
   const inv = inventory.filter(i => i.businessId === businessId);
+  let totalQty = 0, totalMoney = 0, totalDiscount = 0;
+  inv.forEach(i => {
+    totalQty += normalizeNumber(i.qty);
+    totalMoney += normalizeNumber(i.qty) * normalizeNumber(i.price);
+    totalDiscount += normalizeNumber(i.discount);
+  });
+  const netTotal = totalMoney - totalDiscount;
+
+  const invSummary = `
+    <div id="summary">
+      Tổng: ${formatMoney(totalQty)} sản phẩm | Tổng số tiền: ${formatMoney(totalMoney)}<br/>
+      🟢 Tổng chiết khấu: ${formatMoney(totalDiscount)}<br/>
+      💵 Tổng sau chiết khấu: ${formatMoney(netTotal)}
+    </div>
+  `;
+
   const invTable = `
     <h4>Tồn kho</h4>
     <table>
@@ -372,17 +541,20 @@ function showBusinessDetails(businessId) {
     </table>
   `;
 
-  const history = invoices.filter(i => i.businessId === businessId);
+  const latestInvoiceTableEl = document.getElementById('latestInvoiceTable');
+  if (latestInvoiceTableEl) latestInvoiceTableEl.innerHTML = latestInvoiceTable;
+
   const historyTable = `
     <h4>Lịch sử hóa đơn</h4>
     <table>
-      <thead><tr><th>Số HĐ</th><th>MCCQT</th><th>Ngày</th><th>Loại</th><th>Thao tác</th></tr></thead>
+      <thead><tr><th>Số HĐ</th><th>MCCQT</th><th>Ngày lập</th><th>Ngày nhập</th><th>Loại</th><th>Thao tác</th></tr></thead>
       <tbody>
-        ${history.map(i => `
+        ${businessInvoices.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate)).map(i => `
           <tr>
             <td>${i.series}-${i.number}</td>
             <td>${i.mccqt}</td>
             <td>${i.date}</td>
+            <td>${new Date(i.uploadDate).toLocaleString('vi-VN')}</td>
             <td>${i.direction === 'input' ? 'Nhập' : 'Xuất'}</td>
             <td><a href="${i.file}" target="_blank">Xem</a></td>
           </tr>
@@ -391,12 +563,40 @@ function showBusinessDetails(businessId) {
     </table>
   `;
 
-  document.getElementById('businessDetails').innerHTML = `
+  const revenueReport = generateRevenueReport(businessInvoices);
+  const taxReport = generateTaxReport(businessInvoices);
+
+  const businessDetails = document.getElementById('details');
+  if (!businessDetails) return;
+  businessDetails.innerHTML = `
     <h4>${business.name} (MST: ${business.taxCode})</h4>
     <p>Địa chỉ: ${business.address || 'N/A'}</p>
+    ${invSummary}
     ${invTable}
+    <div id="latestInvoiceTable" class="toggle-section">${latestInvoiceTable}</div>
+    <button onclick="toggleLatestInvoice()">📄 Xem Hóa đơn Gần nhất</button>
     ${historyTable}
+    ${revenueReport}
+    ${taxReport}
   `;
+}
+
+function generateRevenueReport(invoices) {
+  const now = new Date();
+  const periods = [
+    { label: 'Tháng này', start: new Date(now.getFullYear(), now.getMonth(), 1), end: now },
+    { label: 'Quý này', start: new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1), end: now },
+    { label: 'Năm nay', start: new Date(now.getFullYear(), 0, 1), end: now }
+  ];
+
+  let html = '<h4>Báo cáo doanh thu</h4>';
+  periods.forEach(period => {
+    const filtered = invoices.filter(i => i.direction === 'output' && new Date(i.uploadDate) >= period.start && new Date(i.uploadDate) <= period.end);
+    const total = filtered.reduce((sum, i) => sum + i.netTotal, 0);
+    html += `<p>${period.label}: ${formatMoney(total)} VNĐ</p>`;
+  });
+
+  return html;
 }
 
 function formatMoney(number) {
@@ -406,6 +606,7 @@ function formatMoney(number) {
 
 function addEmptyRow() {
   const table = document.querySelector('#tableResult table tbody');
+  if (!table) return;
   const newRow = document.createElement('tr');
   newRow.innerHTML = `
     <td>#</td>
@@ -431,56 +632,62 @@ function updateComputedTotals() {
   let totalDiscount = 0;
 
   document.querySelectorAll('#tableResult tbody tr').forEach(row => {
-    const type = row.children[1].innerText.trim();
+    const type = row.children[1].textContent.trim();
     const qtyEl = row.querySelector('.qty');
     const priceEl = row.querySelector('.price');
     const totalEl = row.querySelector('.total');
 
-    const qty = normalizeNumber(qtyEl?.innerText);
-    const price = normalizeNumber(priceEl?.innerText);
+    const qty = normalizeNumber(qtyEl?.textContent);
+    const price = normalizeNumber(priceEl?.textContent);
     const computed = qty * price;
 
     if (type === 'Hàng hóa, dịch vụ') {
       totalQty += qty;
       totalMoney += computed;
-      totalEl.innerText = formatMoney(computed);
+      totalEl.textContent = formatMoney(computed);
     } else {
-      const total = normalizeNumber(totalEl.innerText);
+      const total = normalizeNumber(totalEl.textContent);
       totalDiscount += total;
-      totalEl.innerText = formatMoney(total);
+      totalEl.textContent = formatMoney(total);
     }
   });
 
   if (!manualNetEdit) {
     const net = totalMoney - totalDiscount;
-    document.getElementById('netTotal').innerText = formatMoney(net);
+    const netTotal = document.getElementById('netTotal');
+    if (netTotal) netTotal.textContent = formatMoney(net);
   }
 
-  document.getElementById('totalQty').innerText = formatMoney(totalQty);
-  document.getElementById('totalMoney').innerText = formatMoney(totalMoney);
-  document.getElementById('totalDiscount').innerText = formatMoney(totalDiscount);
+  const totalQtyEl = document.getElementById('totalQty');
+  const totalMoneyEl = document.getElementById('totalMoney');
+  const totalDiscountEl = document.getElementById('totalDiscount');
+  if (totalQtyEl) totalQtyEl.textContent = formatMoney(totalQty);
+  if (totalMoneyEl) totalMoneyEl.textContent = formatMoney(totalMoney);
+  if (totalDiscountEl) totalDiscountEl.textContent = formatMoney(totalDiscount);
 }
 
 document.getElementById('searchInput').addEventListener('input', function(e) {
   const query = e.target.value.toLowerCase().trim();
   const results = document.getElementById('searchResults');
-  if (!query) {
-    results.innerHTML = '';
+  if (!results || !query) {
+    if (results) results.innerHTML = '';
     return;
   }
 
   const invoiceMatches = invoices.filter(i => 
     i.mccqt.toLowerCase().includes(query) ||
     i.number.toLowerCase().includes(query) ||
-    i.series.toLowerCase().includes(query)
+    i.series.toLowerCase().includes(query) ||
+    i.seller.taxCode.toLowerCase().includes(query) ||
+    i.businessId === businesses.find(b => b.taxCode.toLowerCase().includes(query))?.id
   );
 
-  const businessMatches = businesses.filter(b =>
+  const businessMatches = businesses.filter(b => 
     b.name.toLowerCase().includes(query) ||
     b.taxCode.toLowerCase().includes(query)
   );
 
-  const distributorMatches = invoices.filter(i =>
+  const distributorMatches = invoices.filter(i => 
     i.seller.name.toLowerCase().includes(query) ||
     i.seller.taxCode.toLowerCase().includes(query)
   ).map(i => i.seller);
@@ -501,17 +708,18 @@ document.getElementById('searchInput').addEventListener('input', function(e) {
     `).join('') + '</ul>';
   }
   if (distributorMatches.length) {
-    html += '<h4>Nhà phân phối</h4><ul>' + [...new Set(distributorMatches.map(d => d.name + d.taxCode))].map(d => {
+    html += '<h4>Nhà cung cấp</h4><ul>' + [...new Set(distributorMatches.map(d => d.name + d.taxCode))].map(d => {
       const seller = distributorMatches.find(s => (s.name + s.taxCode) === d);
       return `<li>${seller.name} (MST: ${seller.taxCode})</li>`;
     }).join('') + '</ul>';
   }
 
-  results.innerHTML = html || 'Không tìm thấy kết quả';
+  results.innerHTML = html || '<p>Không tìm thấy kết quả.</p>';
 });
 
-updateBusinessList();
-document.getElementById('business').classList.add('active'); // Show HKD list by default
+document.addEventListener('DOMContentLoaded', () => {
+  updateBusinessList();
+});
 </script>
 </body>
 </html>
