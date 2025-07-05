@@ -4,179 +4,55 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Quản lý Hóa đơn & Tồn kho</title>
+  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-    .container {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
-    .sidebar {
-      width: 260px;
-      background: #f0f0f0;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      border-right: 1px solid #ccc;
-      overflow-y: auto;
-    }
-    .sidebar input[type="text"],
-    .sidebar input[type="file"] {
-      width: 100%;
-      padding: 6px;
-      box-sizing: border-box;
-      font-size: 14px;
-    }
-    .tab-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-      gap: 8px;
-    }
-    .tab-button {
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 8px;
-      font-size: 14px;
-      cursor: pointer;
-      text-align: center;
-      border-radius: 4px;
-      transition: all 0.2s;
-    }
-    .tab-button:hover {
-      background: #e0e0e0;
-    }
-    .tab-button.active {
-      background: #d0eaff;
-      font-weight: bold;
-      border-color: #007bff;
-    }
-    .save-token-button {
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 6px;
-      font-size: 16px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .main-content {
-      flex: 1;
-      padding: 10px;
-      overflow-y: auto;
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10px 0;
-    }
-    table th, table td {
-      border: 1px solid #ccc;
-      padding: 6px;
-      font-size: 14px;
-    }
-    .controls {
-      margin-top: 10px;
-      display: flex;
-      gap: 8px;
-    }
-    .section {
-      margin-top: 20px;
-    }
-    .hidden {
-      display: none;
-    }
-
-    @media (max-width: 768px) {
-      .container {
-        flex-direction: column;
-      }
-      .sidebar {
-        width: 100%;
-        flex-direction: column;
-        border-right: none;
-        border-bottom: 1px solid #ccc;
-      }
-      .main-content {
-        padding: 6px;
-      }
-    }
-  </style>
 </head>
 <body>
+  <div class="overlay-tabs">
+    <button class="bubble-button" onclick="showTab('inventoryTab', this)">📦</button>
+    <button class="bubble-button" onclick="showTab('invoicesTab', this)">🧾</button>
+    <button class="bubble-button" onclick="showTab('priceListTab', this)">💰</button>
+    <button class="bubble-button" onclick="showTab('exportHistoryTab', this)">🕓</button>
+    <button class="bubble-button" onclick="showTab('exportTab', this)">📤</button>
+    <button class="bubble-button" onclick="alert('Tính năng Báo cáo thuế đang xây dựng')">📊</button>
+  </div>
+
   <div class="container">
-    <div class="sidebar">
-      <button onclick="clearAllData()">🗑️ Xóa dữ liệu</button>
+    <div class="top-bar">
+      <button onclick="clearAllData()">🗑️ Xóa</button>
       <input type="file" id="pdfInput" accept="application/pdf" multiple>
-      <input type="text" id="searchInput" placeholder="Tìm kiếm Hộ Kinh Doanh...">
-      
-      <div class="tab-grid">
-        <button class="tab-button active" onclick="switchTab('inventoryTab', this)">📦 Tồn kho</button>
-        <button class="tab-button" onclick="switchTab('invoicesTab', this)">🧾 Hóa đơn</button>
-        <button class="tab-button" onclick="switchTab('priceListTab', this)">💲 Bảng giá</button>
-        <button class="tab-button" onclick="switchTab('exportHistoryTab', this)">🕒 Lịch sử</button>
-        <button class="tab-button" onclick="switchTab('exportTab', this)">📤 Xuất hàng</button>
-        <button class="tab-button" onclick="alert('Tính năng Báo cáo thuế đang xây dựng')">📊 Thuế</button>
-      </div>
-
+      <input type="text" id="searchInput" placeholder="Tìm Hộ KD...">
       <input type="text" id="githubToken" placeholder="GitHub Token">
-      <button class="save-token-button" onclick="saveGitHubToken()">💾</button>
-
-      <div id="searchResults"></div>
-      <div id="businessList"></div>
+      <button onclick="saveGitHubToken()">💾</button>
     </div>
+
+    <div id="searchResults"></div>
+    <div id="businessList"></div>
 
     <div class="main-content">
       <div id="invoiceInfo"></div>
 
-      <div id="inventoryTab" class="tab-content active">
-        <h4>Thông tin Tồn kho</h4>
-        <div id="businessDetails">
-          <table id="invoiceTable">
-            <thead><tr id="headerRow"></tr></thead>
-            <tbody></tbody>
-          </table>
-          <div id="autoInvoiceTotal">Tổng tiền: 0 VND</div>
-        </div>
+      <div id="businessDetails">
+        <h3>Chi tiết Hộ Kinh Doanh</h3>
+        <table id="invoiceTable">
+          <thead><tr id="headerRow"></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="autoInvoiceTotal">Tổng tiền: 0 VND</div>
       </div>
 
-      <div id="invoicesTab" class="tab-content">
-        <h4>Danh sách hóa đơn</h4>
-        <div id="invoicesContent"></div>
-      </div>
+      <!-- Các tab nội dung -->
+      <div id="inventoryTab" class="tab-content active-tab">Tồn kho</div>
+      <div id="invoicesTab" class="tab-content hidden">Danh sách Hóa đơn</div>
+      <div id="priceListTab" class="tab-content hidden">Bảng giá</div>
+      <div id="exportHistoryTab" class="tab-content hidden">Lịch sử xuất</div>
+      <div id="exportTab" class="tab-content hidden">Xuất hàng</div>
 
-      <div id="priceListTab" class="tab-content">
-        <h4>Bảng giá bán</h4>
-        <div id="priceListContent"></div>
-      </div>
+      <div id="invoiceDetails" class="section"></div>
 
-      <div id="exportHistoryTab" class="tab-content">
-        <h4>Lịch sử xuất hàng</h4>
-        <div id="exportHistoryContent"></div>
-      </div>
-
-      <div id="exportTab" class="tab-content">
-        <h4>Xuất hàng hóa</h4>
-        <div id="exportContent"></div>
-      </div>
-
-      <!-- Nhập tồn kho thủ công -->
       <div id="manualInventoryForm" class="section hidden">
         <h4>Nhập Tồn kho Thủ công</h4>
         <table class="compact-table">
@@ -188,7 +64,7 @@
           <tbody id="manualInventoryItemsBody"></tbody>
         </table>
         <div class="controls">
-          <button onclick="addManualInventoryItem()">➕ Thêm sản phẩm</button>
+          <button onclick="addManualInventoryItem()">➕ Thêm</button>
           <button onclick="saveManualInventory()">💾 Lưu</button>
           <button onclick="hideManualInventoryForm()">❌ Hủy</button>
         </div>
@@ -197,22 +73,6 @@
       <textarea id="pdfTextArea" style="display:none;"></textarea>
     </div>
   </div>
-
-  <script>
-    let selectedBusinessId = null;
-
-    function switchTab(tabId, btn) {
-      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-
-      document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
-      btn.classList.add('active');
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      updateBusinessList();
-    });
-  </script>
 
   <script src="script.js"></script>
 </body>
