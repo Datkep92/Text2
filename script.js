@@ -1,3 +1,58 @@
+let selectedBusinessId = null;
+
+function updateSelectedBusinessId(businessId) {
+  selectedBusinessId = businessId;
+  showFullScreenBusinessDetails();
+}
+
+function showFullScreenBusinessDetails() {
+  document.querySelector('.main-content').scrollIntoView({ behavior: 'smooth' });
+}
+
+function showTab(tabId, button) {
+  document.querySelectorAll('.tab-content').forEach(tab => {
+    tab.classList.add('hidden');
+  });
+
+  const targetTab = document.getElementById(tabId);
+  if (targetTab) {
+    targetTab.classList.remove('hidden');
+    targetTab.classList.add('active-tab');
+  }
+}
+
+function clearAllData() {
+  if (confirm('Bạn có chắc muốn xóa toàn bộ dữ liệu?')) {
+    localStorage.clear();
+    location.reload();
+  }
+}
+
+function saveGitHubToken() {
+  const token = document.getElementById('githubToken').value.trim();
+  if (token) {
+    localStorage.setItem('github_token', token);
+    alert('Đã lưu token!');
+  }
+}
+
+// Dữ liệu test danh sách HKD
+function updateBusinessList() {
+  const list = document.getElementById('businessList');
+  list.innerHTML = '';
+  ['HKD A', 'HKD B', 'HKD C'].forEach((hkd, idx) => {
+    const div = document.createElement('div');
+    div.textContent = hkd;
+    div.className = 'business-item';
+    div.onclick = () => updateSelectedBusinessId(idx);
+    list.appendChild(div);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateBusinessList();
+});
+
 // =============================================
 // 1. KHAI BÁO HẰNG SỐ VÀ BIẾN TOÀN CỤC
 // =============================================
