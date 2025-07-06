@@ -1,58 +1,3 @@
-let selectedBusinessId = null;
-
-function updateSelectedBusinessId(businessId) {
-  selectedBusinessId = businessId;
-  showFullScreenBusinessDetails();
-}
-
-function showFullScreenBusinessDetails() {
-  document.querySelector('.main-content').scrollIntoView({ behavior: 'smooth' });
-}
-
-function showTab(tabId, button) {
-  document.querySelectorAll('.tab-content').forEach(tab => {
-    tab.classList.add('hidden');
-  });
-
-  const targetTab = document.getElementById(tabId);
-  if (targetTab) {
-    targetTab.classList.remove('hidden');
-    targetTab.classList.add('active-tab');
-  }
-}
-
-function clearAllData() {
-  if (confirm('Bạn có chắc muốn xóa toàn bộ dữ liệu?')) {
-    localStorage.clear();
-    location.reload();
-  }
-}
-
-function saveGitHubToken() {
-  const token = document.getElementById('githubToken').value.trim();
-  if (token) {
-    localStorage.setItem('github_token', token);
-    alert('Đã lưu token!');
-  }
-}
-
-// Dữ liệu test danh sách HKD
-function updateBusinessList() {
-  const list = document.getElementById('businessList');
-  list.innerHTML = '';
-  ['HKD A', 'HKD B', 'HKD C'].forEach((hkd, idx) => {
-    const div = document.createElement('div');
-    div.textContent = hkd;
-    div.className = 'business-item';
-    div.onclick = () => updateSelectedBusinessId(idx);
-    list.appendChild(div);
-  });
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  updateBusinessList();
-});
-
 // =============================================
 // 1. KHAI BÁO HẰNG SỐ VÀ BIẾN TOÀN CỤC
 // =============================================
@@ -69,6 +14,187 @@ let inventory = [];
 let exportedInvoices = [];
 let manualNetEdit = false;
 let allowDuplicates = false;
+let lastActiveBusinessId = null; // Thêm biến này
+let activityLogs = []; // Thêm mảng lưu log hoạt động
+// Thêm biến lưu trữ lịch sử
+let sessionHistory = [];
+let undoStack = [];
+const MAX_UNDO_STEPS = 20;
+const SESSION_HISTORY_KEY = 'lastSessionState';
+// =============================================
+// 2. HÀM TIỆN ÍCH CHUNG
+// =============================================
+function saveCurrentState() {
+    const currentState = {
+        businesses: JSON.parse(JSON.stringify(businesses)),
+        invoices: JSON.parse(JSON.stringify(invoices)),
+        inventory: JSON.parse(JSON.stringify(inventory)),
+        exportedInvoices: JSON.parse(JSON.stringify(exportedInvoices)),
+        lastActiveBusinessId: lastActiveBusinessId,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Lưu vào localStorage để khôi phục sau này
+    localStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(currentState));
+    
+    // Thêm vào undo stack (giới hạn 20 bước)
+    undoStack.unshift(currentState);
+    if (undoStack.length > MAX_UNDO_STEPS) {
+        undoStack.pop();
+    }
+    
+    return currentState;
+}
+
+function restorePreviousSession() {
+    try {
+        if (confirm('Bạn có chắc muốn khôi phục trạng thái phiên làm việc trước? Mọi thay đổi chưa lưu sẽ bị mất.')) {
+            const savedState = localStorage.getItem(SESSION_HISTORY_KEY);
+            if (!savedState) {
+                alert('Không tìm thấy dữ liệu phiên làm việc trước!');
+                return;
+            }
+            
+            const previousState = JSON.parse(savedState);
+            businesses = previousState.businesses;
+            invoices = previousState.invoices;
+            inventory = previousState.inventory;
+            exportedInvoices = previousState.exportedInvoices;
+            lastActiveBusinessId = previousState.lastActiveBusinessId;
+            
+            // Cập nhật localStorage
+            localStorage.setItem('businesses', JSON.stringify(businesses));
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+            localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
+            
+            // Cập nhật giao diện
+            updateBusinessList();
+            if (lastActiveBusinessId) {
+                showBusinessDetails(lastActiveBusinessId);
+            } else if (businesses.length > 0) {
+                showBusinessDetails(businesses[0].id);
+            }
+            
+            alert('Đã khôi phục trạng thái phiên làm việc trước!');
+            
+            // Ghi log
+            logActivity('system', 'Khôi phục phiên làm việc trước');
+        }
+    } catch (e) {
+        console.error('Lỗi restorePreviousSession:', e);
+        alert('Lỗi khi khôi phục phiên làm việc trước: ' + e.message);
+    }
+}
+
+function undoLastAction() {
+    try {
+        if (undoStack.length === 0) {
+            alert('Không có thao tác nào để hoàn tác!');
+            return;
+        }
+        
+        const previousState = undoStack[0]; // Xem trước trạng thái
+        const businessNames = previousState.businesses.map(b => b.name).join(', ');
+        
+        if (confirm(`Bạn có chắc muốn hoàn tác thao tác gần nhất?\nTrạng thái trước đó có ${previousState.businesses.length} HKD: ${businessNames}`)) {
+            const stateToRestore = undoStack.shift();
+            
+            // Khôi phục từng phần dữ liệu
+            businesses = stateToRestore.businesses;
+            invoices = stateToRestore.invoices;
+            inventory = stateToRestore.inventory;
+            exportedInvoices = stateToRestore.exportedInvoices;
+            lastActiveBusinessId = stateToRestore.lastActiveBusinessId;
+            
+            // Cập nhật localStorage
+            localStorage.setItem('businesses', JSON.stringify(businesses));
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+            localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
+            
+            // Cập nhật giao diện
+            updateBusinessList();
+            if (lastActiveBusinessId) {
+                showBusinessDetails(lastActiveBusinessId);
+            } else if (businesses.length > 0) {
+                showBusinessDetails(businesses[0].id);
+            }
+            
+            alert(`Đã hoàn tác thành công! Còn ${undoStack.length} lần hoàn tác.`);
+            
+            logActivity('system', 'Hoàn tác thao tác', {
+                restoredBusinesses: businesses.length,
+                restoredInvoices: invoices.length
+            });
+        }
+    } catch (e) {
+        console.error('Lỗi undoLastAction:', e);
+        alert('Lỗi khi hoàn tác: ' + e.message);
+    }
+}
+
+//ghi log
+function exportLogsToExcel() {
+    try {
+        const filteredLogs = selectedBusinessId 
+            ? activityLogs.filter(log => log.businessId === selectedBusinessId)
+            : activityLogs;
+
+        if (filteredLogs.length === 0) {
+            alert('Không có dữ liệu log để xuất!');
+            return;
+        }
+
+        const rows = [
+            ['Thời gian', 'Hành động', 'Chi tiết', 'Mã HKD']
+        ].concat(
+            filteredLogs.map(log => [
+                new Date(log.timestamp).toLocaleString('vi-VN'),
+                getActionDescription(log.action),
+                JSON.stringify(log.details),
+                log.businessId || ''
+            ])
+        );
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'LichSuHoatDong');
+        XLSX.writeFile(wb, `LichSuHoatDong_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (e) {
+        console.error('Lỗi khi xuất log:', e);
+        alert('Lỗi khi xuất file Excel: ' + e.message);
+    }
+}
+
+function clearActivityLogs() {
+    if (confirm('Bạn có chắc muốn xóa toàn bộ lịch sử hoạt động?')) {
+        activityLogs = [];
+        localStorage.setItem('activityLogs', JSON.stringify(activityLogs));
+        showActivityLogTab();
+        alert('Đã xóa toàn bộ lịch sử hoạt động!');
+    }
+}
+// =============================================
+// 2. HÀM TIỆN ÍCH CHUNG - Thêm hàm này
+// =============================================
+function logActivity(action, details = {}) {
+    const logEntry = {
+        id: generateUUID(),
+        timestamp: new Date().toISOString(),
+        action,
+        details,
+        businessId: selectedBusinessId || null
+    };
+    
+    activityLogs.unshift(logEntry); // Thêm vào đầu mảng để mới nhất lên đầu
+    localStorage.setItem('activityLogs', JSON.stringify(activityLogs));
+    
+    // Nếu tab log đang mở thì cập nhật UI
+    if (document.getElementById('activityLogTab') && !document.getElementById('activityLogTab').classList.contains('hidden')) {
+        showActivityLogTab();
+    }
+}
 
 // Khởi tạo dữ liệu từ localStorage
 try {
@@ -76,6 +202,16 @@ try {
     invoices = JSON.parse(localStorage.getItem('invoices')) || [];
     inventory = JSON.parse(localStorage.getItem('inventory')) || [];
     exportedInvoices = JSON.parse(localStorage.getItem('exportedInvoices')) || [];
+    activityLogs = JSON.parse(localStorage.getItem('activityLogs')) || []; // Thêm dòng này
+
+    
+    // Khôi phục HKD đang làm việc gần nhất nếu có
+    const lastBusiness = businesses[0]; // Mặc định lấy HKD đầu tiên
+    if (lastBusiness) {
+        lastActiveBusinessId = lastBusiness.id;
+    }
+// Lưu trạng thái ban đầu
+    saveCurrentState();
 } catch (e) {
     console.error('Lỗi khi đọc localStorage:', e);
 }
@@ -96,7 +232,71 @@ function generateUUID() {
         return v.toString(16);
     });
 }
+// =============================================
+// 10. TAB LỊCH SỬ LÀM VIỆC
+// =============================================
+function showActivityLogTab() {
+    const logTab = document.getElementById('activityLogTab');
+    if (!logTab) return;
 
+    // Lọc log theo business đang chọn (nếu có)
+    const filteredLogs = selectedBusinessId 
+        ? activityLogs.filter(log => log.businessId === selectedBusinessId)
+        : activityLogs;
+
+    logTab.innerHTML = `
+        <div class="section">
+            <h4>Lịch sử hoạt động (${filteredLogs.length} bản ghi)</h4>
+            <div class="log-controls">
+                <button onclick="exportLogsToExcel()">📤 Xuất Excel</button>
+                <button onclick="clearActivityLogs()">🗑️ Xóa lịch sử</button>
+            </div>
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th>Thời gian</th>
+                        <th>Hành động</th>
+                        <th>Chi tiết</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredLogs.map(log => `
+                        <tr>
+                            <td>${new Date(log.timestamp).toLocaleString('vi-VN')}</td>
+                            <td>${getActionDescription(log.action)}</td>
+                            <td>${getActionDetails(log.details)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// Hàm hỗ trợ hiển thị
+function getActionDescription(action) {
+    const actions = {
+        'invoice_upload': 'Tải hóa đơn',
+        'invoice_edit': 'Sửa hóa đơn',
+        'invoice_delete': 'Xóa hóa đơn',
+        'export_create': 'Tạo phiếu xuất',
+        'inventory_update': 'Cập nhật kho',
+        'business_add': 'Thêm HKD',
+        'business_delete': 'Xóa HKD',
+        'error': 'Lỗi hệ thống'
+    };
+    return actions[action] || action;
+}
+
+function getActionDetails(details) {
+    if (!details) return '';
+    
+    if (typeof details === 'string') return details;
+    
+    return Object.entries(details)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(', ');
+}
 function normalizeNumber(str) {
     if (!str) return 0;
     if (typeof str === 'number') return str;
@@ -191,6 +391,14 @@ function parseToTable(businessId, file, info, direction) {
         taxRate: info.taxRate || '10',
         totalDiscount: info.totalDiscount || 0
     };
+logActivity('invoice_upload', {
+        mccqt: info.mccqt,
+        invoiceNumber: info.so,
+        itemCount: invoice.items.length,
+        direction: direction,
+        fileName: file.name
+    });
+
 
     for (const line of lines) {
         const tokens = line.trim().split(/\s+/);
@@ -477,43 +685,134 @@ function updateBusinessList(selectedId = null) {
         console.error('Không tìm thấy #businessList trong DOM');
         return;
     }
+    
     try {
-        businessList.innerHTML = '<ul>' + businesses.map(b => `
-            <li class="${b.id === selectedId ? 'active' : ''}" onclick="showBusinessDetails('${b.id}'); updateSelectedBusinessId('${b.id}')">
+        // Sắp xếp: HKD đang làm việc lên đầu, các HKD khác theo thứ tự bình thường
+        const sortedBusinesses = [...businesses].sort((a, b) => {
+            if (a.id === lastActiveBusinessId) return -1;
+            if (b.id === lastActiveBusinessId) return 1;
+            return 0;
+        });
+
+        businessList.innerHTML = '<ul>' + sortedBusinesses.map(b => `
+            <li class="${b.id === selectedId ? 'active' : ''}" 
+                onclick="showBusinessDetails('${b.id}'); updateSelectedBusinessId('${b.id}')">
                 ${b.name} (MST: ${b.taxCode}) 
-                <button onclick="editBusinessName('${b.id}', event)">Sửa</button>
+                <button onclick="deleteBusiness('${b.id}', event)">Xóa</button>
             </li>
         `).join('') + '</ul>';
+        
         localStorage.setItem('businesses', JSON.stringify(businesses));
     } catch (e) {
         console.error('Lỗi updateBusinessList:', e);
     }
 }
-
 function updateSelectedBusinessId(businessId) {
     selectedBusinessId = businessId;
     console.log('Selected business ID updated to:', selectedBusinessId); // For debugging
 }
 
-function editBusinessName(businessId, event) {
+// xóa hkd
+function deleteBusiness(businessId, event) {
     event.stopPropagation();
     try {
-        const business = businesses.find(b => b.id === businessId);
-        if (!business) return;
-        const newName = prompt('Nhập tên mới cho Hộ Kinh Doanh:', business.name);
-        if (newName && newName !== business.name) {
-            business.name = newName;
+        if (confirm('Bạn có chắc muốn xóa Hộ Kinh Doanh này? Tất cả dữ liệu liên quan (hóa đơn, tồn kho) cũng sẽ bị xóa.')) {
+            // LƯU TRẠNG THÁI HIỆN TẠI TRƯỚC KHI XÓA
+            const currentState = saveCurrentState();
+            
+            // Xóa tất cả dữ liệu liên quan
+            invoices = invoices.filter(i => i.businessId !== businessId);
+            inventory = inventory.filter(i => i.businessId !== businessId);
+            exportedInvoices = exportedInvoices.filter(i => i.businessId !== businessId);
+            
+            // Xóa HKD khỏi danh sách
+            businesses = businesses.filter(b => b.id !== businessId);
+            
+            // Cập nhật localStorage
             localStorage.setItem('businesses', JSON.stringify(businesses));
-            updateBusinessList(businessId);
-            showBusinessDetails(businessId);
-            showPriceList(businessId);
-            showExportHistory(businessId);
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+            localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
+            
+            // Cập nhật giao diện
+            updateBusinessList();
+            document.getElementById('businessDetails').innerHTML = '<h4>Quản lý Hộ Kinh Doanh</h4>';
+            alert('Đã xóa Hộ Kinh Doanh và tất cả dữ liệu liên quan!');
+
+            // GHI LOG
+            logActivity('business_delete', {
+                businessId: businessId,
+                businessName: businesses.find(b => b.id === businessId)?.name || 'Đã xóa'
+            });
         }
     } catch (e) {
-        console.error('Lỗi editBusinessName:', e);
+        console.error('Lỗi deleteBusiness:', e);
+        alert('Lỗi khi xóa Hộ Kinh Doanh: ' + e.message);
     }
 }
 
+function showActivityLogPopup() {
+    try {
+        const existingPopup = document.getElementById('activityLogPopup');
+        if (existingPopup) {
+            existingPopup.remove();
+            return;
+        }
+        const filteredLogs = selectedBusinessId 
+            ? activityLogs.filter(log => log.businessId === selectedBusinessId)
+            : activityLogs;
+        const popupContent = `
+            <div class="popup-content" style="background: #fff; padding: 20px; border-radius: 8px; max-width: 90%; max-height: 90%; overflow: auto; position: relative; margin: 0 auto;">
+                <span class="close-popup" style="position: absolute; top: 10px; right: 10px; background: #ff4444; color: #fff; border: none; border-radius: 3px; cursor: pointer; padding: 5px 10px; font-size: 16px; line-height: 1;" onclick="closePopup('activityLogPopup')">×</span>
+                <h3>Lịch sử hoạt động</h3>
+                <div class="log-controls" style="margin-bottom: 10px;">
+                    <button onclick="exportLogsToExcel()">📤 Xuất Excel</button>
+                    <button onclick="clearActivityLogs()">🗑️ Xóa lịch sử</button>
+                </div>
+                <div class="log-container" style="max-height: 70vh; overflow-y: auto;">
+                    <table class="log-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Thời gian</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Hành động</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Chi tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredLogs.map(log => `
+                                <tr>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${new Date(log.timestamp).toLocaleString('vi-VN')}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${getActionDescription(log.action)}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">${getActionDetails(log.details)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        const popup = document.createElement('div');
+        popup.className = 'popup';
+        popup.id = 'activityLogPopup';
+        popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 999; display: flex; justify-content: center; align-items: center;';
+        popup.innerHTML = popupContent;
+        document.body.appendChild(popup);
+        popup.addEventListener('click', function(e) {
+            if (e.target === popup) {
+                closePopup('activityLogPopup');
+            }
+        });
+    } catch (e) {
+        console.error('Lỗi showActivityLogPopup:', e);
+        alert('Lỗi khi hiển thị lịch sử hoạt động: ' + e.message);
+    }
+}
+function closePopup() {
+    const popup = document.getElementById('activityLogPopup');
+    if (popup) {
+        popup.remove();
+    }
+}
 
 // =============================================
 // 5. QUẢN LÝ TỒN KHO (INVENTORY)
@@ -608,6 +907,7 @@ function deleteInventoryItem(itemId, businessId) {
 
 function editInventoryItem(itemId, businessId) {
     try {
+    saveCurrentState();
         // Reset trạng thái chỉnh sửa cho tất cả items trước
         inventory.forEach(item => {
             item.isEditing = item.id === itemId;
@@ -677,7 +977,18 @@ function saveOrCancelInventoryItem(itemId, businessId, action) {
             item.isEditing = false;
             item.lastUpdated = new Date().toISOString();
 
+             logActivity('inventory_update', {
+                itemId: itemId,
+                businessId: businessId,
+                action: 'edit',
+                name: fields.name,
+                oldQty: oldQty,
+                newQty: fields.qty,
+                price: fields.price
+            });
+
             localStorage.setItem('inventory', JSON.stringify(inventory));
+        
         } else {
             item.isEditing = false;
         }
@@ -875,6 +1186,7 @@ function showInvoiceDetails(invoiceId) {
                         <button ${!prevInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${prevInvoiceId}')">⬅️ Hóa đơn trước</button>
                         <button onclick="restoreInvoiceToSuccess('${invoiceId}')">🔄 Khôi phục sang thành công</button>
                         <button ${!nextInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${nextInvoiceId}')">Hóa đơn tiếp theo ➡️</button>
+
                     </div>
                 </div>
             </div>
@@ -1789,7 +2101,16 @@ function searchInvoices() {
 function deleteInvoice(id, event) {
     event.stopPropagation();
     try {
+        const invoice = invoices.find(i => i.id === id);
+        if (!invoice) return;
+
         if (confirm('Bạn có chắc muốn xóa hóa đơn này?')) {
+logActivity('invoice_delete', {
+                invoiceId: id,
+                invoiceNumber: `${invoice.series}-${invoice.number}`,
+                businessId: invoice.businessId,
+                itemCount: invoice.items.length
+            });
             const invoice = invoices.find(i => i.id === id);
             if (invoice) {
                 if (invoice.direction === 'input') {
@@ -2009,6 +2330,7 @@ function removeExportItem(itemId, businessId) {
 
 function saveExport(businessId) {
     try {
+    saveCurrentState();
         const tbody = document.getElementById('exportItemsBodyContent');
         if (!tbody || tbody.querySelectorAll('tr').length === 0) {
             console.error('Không tìm thấy #exportItemsBodyContent hoặc bảng trống');
@@ -2457,6 +2779,9 @@ function exportAutoInvoiceToExcel(businessId) {
 // =============================================
 function showBusinessDetails(businessId) {
     try {
+        // Cập nhật HKD đang làm việc
+        lastActiveBusinessId = businessId;
+        
         const businessDetails = document.getElementById('businessDetails');
         if (!businessDetails) return;
         
@@ -3074,8 +3399,57 @@ function suggestItemName(input) {
     }
 }
 
+
+function addUtilityButtons() {
+    const controls = document.createElement('div');
+    controls.id = 'utilityControls';
+    controls.className = 'utility-controls';
+    
+    controls.innerHTML = `
+        <div class="utility-section">
+            <div class="utility-buttons-container">
+                <button onclick="undoLastAction()" class="undo-btn" title="Hoàn tác (Ctrl+Z)">
+                    ↩ Undo (${undoStack.length}/${MAX_UNDO_STEPS})
+                </button>
+                <button onclick="restorePreviousSession()" class="restore-btn" title="Khôi phục phiên trước">
+                    ↻ Khôi phục
+                </button>
+                <button class="tab-button" onclick="showActivityLogPopup()">📝 Lịch sử</button>
+                <button onclick="clearAllData()">🗑️ Deletel All</button>
+                <button class="tab-button active" onclick="showTab('inventoryTab', this, selectedBusinessId)">Tồn kho</button>
+                <button class="tab-button" onclick="showTab('invoicesTab', this, selectedBusinessId)">Hóa đơn</button>
+                <button class="tab-button" onclick="showTab('priceListTab', this, selectedBusinessId)">Giá bán</button>
+                <button class="tab-button" onclick="showTab('exportHistoryTab', this, selectedBusinessId)">Lịch sử xuất hàng</button>
+                <button class="tab-button" onclick="showTab('exportTab', this, selectedBusinessId)">Xuất hàng hóa</button>
+                <button class="tab-button" onclick="showExportJsonPopup()">📤 Lưu GIST</button>
+                <button class="tab-button" onclick="importFromGist()">📥 Nhập GIST</button>
+                <input type="file" id="jsonInput" accept=".json" style="display: none;" onchange="importFromJSON(event)">
+            </div>
+        </div>
+    `;
+    
+    document.body.prepend(controls);
+    
+    // Phím tắt và cập nhật tự động
+    document.addEventListener('keydown', (e) => e.ctrlKey && e.key === 'z' && (e.preventDefault(), undoLastAction()));
+    
+    const updateCounter = () => {
+        const btn = document.querySelector('.undo-btn');
+        if (btn) btn.textContent = `↩ Undo (${undoStack.length}/${MAX_UNDO_STEPS})`;
+    };
+    
+    const originalPush = Array.prototype.push;
+    Array.prototype.push = function() {
+        const result = originalPush.apply(this, arguments);
+        updateCounter();
+        return result;
+    };
+}
+
+
 // Khởi tạo khi tải trang
 document.addEventListener('DOMContentLoaded', () => {
+ addUtilityButtons();
     updateBusinessList();
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
@@ -3091,7 +3465,201 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+// Thêm vào phần HÀM TIỆN ÍCH CHUNG
+function exportToGist(token) {
+    try {
+        const githubToken = token || localStorage.getItem('githubToken') || '';
+        if (!githubToken) {
+            alert('Vui lòng nhập GitHub Token!');
+            return;
+        }
 
+        // Chuẩn bị dữ liệu JSON
+        const data = {
+            businesses: businesses,
+            invoices: invoices,
+            inventory: inventory,
+            exportedInvoices: exportedInvoices,
+            lastActiveBusinessId: lastActiveBusinessId
+        };
+        const jsonString = JSON.stringify(data, null, 2);
+
+        // Cấu hình Gist
+        const gistId = 'e8d0145f86b7f95f0d4e10d3b152d9c9';
+        const gistData = {
+            description: `Data Export All ${new Date().toISOString()}`,
+            public: false,
+            files: {
+                'data.json': {
+                    content: jsonString
+                }
+            }
+        };
+
+        // Gửi yêu cầu cập nhật Gist
+        fetch(`https://api.github.com/gists/${gistId}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `token ${githubToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(gistData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(result => {
+            // Ghi log
+            logActivity('export_json_gist', {
+                exportedRecords: {
+                    businesses: data.businesses.length,
+                    invoices: data.invoices.length,
+                    inventory: data.inventory.length,
+                    exportedInvoices: data.exportedInvoices.length
+                },
+                gistId: gistId,
+                gistUrl: result.html_url
+            });
+
+            alert('Đã xuất dữ liệu lên GitHub Gist thành công! URL: ' + result.html_url);
+        })
+        .catch(error => {
+            console.error('Lỗi exportToGist:', error);
+            alert('Lỗi khi xuất dữ liệu lên Gist: ' + error.message);
+        });
+    } catch (e) {
+        console.error('Lỗi exportToGist:', e);
+        alert('Lỗi khi xuất dữ liệu lên Gist: ' + e.message);
+    }
+}
+
+function showExportJsonPopup() {
+    const popup = document.createElement('div');
+    popup.id = 'exportJsonPopup';
+    popup.className = 'popup';
+    popup.innerHTML = `
+        <div class="popup-content">
+            <h3>Xuất dữ liệu lên GitHub Gist</h3>
+            <p style="color: red;">Lưu ý: Dữ liệu cũ trong Gist sẽ bị ghi đè!</p>
+            <label for="gistTokenInput">GitHub Token:</label>
+            <input type="text" id="gistTokenInput" placeholder="Nhập GitHub Token" value="${localStorage.getItem('githubToken') || ''}">
+            <div class="popup-actions">
+                <button onclick="saveAndExportToGist()">💾 Xuất JSON</button>
+                <button onclick="closeExportJsonPopup()">❌ Hủy</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+    document.getElementById('gistTokenInput').focus();
+}
+
+function saveAndExportToGist() {
+    const token = document.getElementById('gistTokenInput').value.trim();
+    if (token) {
+        localStorage.setItem('githubToken', token);
+        exportToGist(token);
+        closeExportJsonPopup();
+    } else {
+        alert('Vui lòng nhập GitHub Token!');
+    }
+}
+
+function closeExportJsonPopup() {
+    const popup = document.getElementById('exportJsonPopup');
+    if (popup) popup.remove();
+}
+
+function importFromGist() {
+    try {
+        const gistId = 'e8d0145f86b7f95f0d4e10d3b152d9c9';
+        fetch(`https://api.github.com/gists/${gistId}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/vnd.github+json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const fileContent = data.files && data.files['data.json'] && data.files['data.json'].content;
+            if (!fileContent) {
+                throw new Error('Gist không chứa file data.json hoặc file rỗng!');
+            }
+            let parsedData;
+            try {
+                parsedData = JSON.parse(fileContent);
+            } catch (e) {
+                throw new Error('Nội dung JSON không hợp lệ: ' + e.message);
+            }
+            if (!Array.isArray(parsedData.businesses) ||
+                !Array.isArray(parsedData.invoices) ||
+                !Array.isArray(parsedData.inventory) ||
+                !Array.isArray(parsedData.exportedInvoices)) {
+                throw new Error('Dữ liệu JSON không đúng định dạng! Các trường businesses, invoices, inventory, exportedInvoices phải là mảng.');
+            }
+            const hasValidBusinesses = parsedData.businesses.every(b => b.id && b.name && b.taxCode && b.address);
+            const hasValidInvoices = parsedData.invoices.every(i => i.id && i.businessId && i.mccqt && i.number && i.series && i.date && i.seller && i.items);
+            const hasValidInventory = parsedData.inventory.every(i => i.id && i.businessId && i.name && i.unit && i.qty && i.price);
+            const hasValidExportedInvoices = parsedData.exportedInvoices.every(e => e.id && e.businessId && e.exportCode && e.exportDate && e.items);
+            if (!hasValidBusinesses || !hasValidInvoices || !hasValidInventory || !hasValidExportedInvoices) {
+                throw new Error('Dữ liệu trong JSON không hợp lệ! Vui lòng kiểm tra cấu trúc dữ liệu.');
+            }
+            const businessIds = new Set(parsedData.businesses.map(b => b.id));
+            const invalidInvoices = parsedData.invoices.some(i => !businessIds.has(i.businessId));
+            const invalidInventory = parsedData.inventory.some(i => !businessIds.has(i.businessId));
+            const invalidExportedInvoices = parsedData.exportedInvoices.some(e => !businessIds.has(e.businessId));
+            if (invalidInvoices || invalidInventory || invalidExportedInvoices) {
+                throw new Error('JSON chứa businessId không hợp lệ! Vui lòng đảm bảo tất cả businessId đều tồn tại trong danh sách businesses.');
+            }
+            saveCurrentState();
+            businesses = [...parsedData.businesses];
+            invoices = [...parsedData.invoices];
+            inventory = [...parsedData.inventory];
+            exportedInvoices = [...parsedData.exportedInvoices];
+            lastActiveBusinessId = parsedData.lastActiveBusinessId || parsedData.businesses[0]?.id || null;
+            localStorage.setItem('businesses', JSON.stringify(businesses));
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+            localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
+            localStorage.setItem('lastActiveBusinessId', lastActiveBusinessId);
+            updateBusinessList(lastActiveBusinessId);
+            if (lastActiveBusinessId) {
+                showBusinessDetails(lastActiveBusinessId);
+                showPriceList(lastActiveBusinessId);
+                showExportHistory(lastActiveBusinessId);
+            } else {
+                document.getElementById('businessDetails').innerHTML = '';
+                document.getElementById('priceList').innerHTML = '';
+                document.getElementById('exportHistory').innerHTML = '';
+            }
+            logActivity('import_json_gist', {
+                importedRecords: {
+                    businesses: parsedData.businesses.length,
+                    invoices: parsedData.invoices.length,
+                    inventory: parsedData.inventory.length,
+                    exportedInvoices: parsedData.exportedInvoices.length
+                },
+                gistId: gistId,
+                gistUrl: data.html_url
+            });
+            alert('Đã nhập dữ liệu từ GitHub Gist thành công! URL: ' + data.html_url);
+        })
+        .catch(error => {
+            console.error('Lỗi importFromGist:', error);
+            alert('Lỗi khi nhập dữ liệu từ Gist: ' + error.message);
+        });
+    } catch (e) {
+        console.error('Lỗi importFromGist:', e);
+        alert('Lỗi khi nhập dữ liệu từ Gist: ' + e.message);
+    }
+}
 // =============================================
 // 7. QUẢN LÝ XUẤT HÀNG (EXPORT) - Bổ sung các hàm còn thiếu
 // =============================================
@@ -3342,6 +3910,12 @@ function saveExport(businessId) {
         }
 
         const grandTotal = items.reduce((sum, item) => sum + normalizeNumber(item.total), 0);
+logActivity('export_create', {
+            businessId: businessId,
+            itemCount: items.length,
+            totalAmount: grandTotal,
+            customerName: document.getElementById('customerName')?.value || 'Không xác định'
+        });
         const exportRecord = {
             id: generateUUID(),
             businessId,
@@ -4546,4 +5120,13 @@ function exportManualInvoice(businessId) {
         throw e;
     }
 }
+
+document.querySelectorAll('.tab-button').forEach(button => {
+  button.addEventListener('click', function() {
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    this.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+    document.getElementById(this.dataset.target).classList.remove('hidden');
+  });
+});
 ///////////////////////////////

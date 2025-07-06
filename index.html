@@ -1,56 +1,48 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quản lý Hóa đơn & Tồn kho</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-  <div class="overlay-tabs">
-    <button class="bubble-button" onclick="showTab('inventoryTab', this)">📦</button>
-    <button class="bubble-button" onclick="showTab('invoicesTab', this)">🧾</button>
-    <button class="bubble-button" onclick="showTab('priceListTab', this)">💰</button>
-    <button class="bubble-button" onclick="showTab('exportHistoryTab', this)">🕓</button>
-    <button class="bubble-button" onclick="showTab('exportTab', this)">📤</button>
-    <button class="bubble-button" onclick="alert('Tính năng Báo cáo thuế đang xây dựng')">📊</button>
-  </div>
-
   <div class="container">
-    <div class="top-bar">
-      <button onclick="clearAllData()">🗑️ Xóa</button>
-      <input type="file" id="pdfInput" accept="application/pdf" multiple>
-      <input type="text" id="searchInput" placeholder="Tìm Hộ KD...">
-      <input type="text" id="githubToken" placeholder="GitHub Token">
-      <button onclick="saveGitHubToken()">💾</button>
-    </div>
-
-    <div id="searchResults"></div>
-    <div id="businessList"></div>
-
+   <div class="sidebar">
+  <input type="file" id="pdfInput" accept="application/pdf" multiple>
+  <div id="status"></div>
+  <input type="text" id="searchInput" placeholder="Tìm kiếm Hộ Kinh Doanh...">
+  
+  <div id="searchResults"></div>
+  <div id="businessList"></div>
+</div>
+    
     <div class="main-content">
       <div id="invoiceInfo"></div>
-
       <div id="businessDetails">
-        <h3>Chi tiết Hộ Kinh Doanh</h3>
+        <h4>Chi tiết Hộ Kinh Doanh</h4>
+        <!-- Đã xóa phần tabs từ đây -->
+        
         <table id="invoiceTable">
-          <thead><tr id="headerRow"></tr></thead>
+          <thead>
+            <tr id="headerRow"></tr>
+          </thead>
           <tbody></tbody>
         </table>
         <div id="autoInvoiceTotal">Tổng tiền: 0 VND</div>
       </div>
-
-      <!-- Các tab nội dung -->
-      <div id="inventoryTab" class="tab-content active-tab">Tồn kho</div>
-      <div id="invoicesTab" class="tab-content hidden">Danh sách Hóa đơn</div>
-      <div id="priceListTab" class="tab-content hidden">Bảng giá</div>
-      <div id="exportHistoryTab" class="tab-content hidden">Lịch sử xuất</div>
-      <div id="exportTab" class="tab-content hidden">Xuất hàng</div>
-
+      
+      <!-- Các tab content -->
+      <div id="inventoryTab" class="tab-content"></div>
+      <div id="invoicesTab" class="tab-content hidden"></div>
+      <div id="priceListTab" class="tab-content hidden"></div>
+      <div id="exportHistoryTab" class="tab-content hidden"></div>
+      <div id="exportTab" class="tab-content hidden"></div>
+      
       <div id="invoiceDetails" class="section"></div>
 
       <div id="manualInventoryForm" class="section hidden">
@@ -64,7 +56,7 @@
           <tbody id="manualInventoryItemsBody"></tbody>
         </table>
         <div class="controls">
-          <button onclick="addManualInventoryItem()">➕ Thêm</button>
+          <button onclick="addManualInventoryItem()">➕ Thêm sản phẩm</button>
           <button onclick="saveManualInventory()">💾 Lưu</button>
           <button onclick="hideManualInventoryForm()">❌ Hủy</button>
         </div>
@@ -74,6 +66,24 @@
     </div>
   </div>
 
+  <script>
+    let selectedBusinessId = null;
+    function updateSelectedBusinessId(businessId) {
+      selectedBusinessId = businessId;
+      console.log('Selected business ID updated:', selectedBusinessId); // Debug
+    }
+
+    // Đảm bảo hàm showTab được gọi khi click tab
+    document.addEventListener('DOMContentLoaded', () => {
+      updateBusinessList(); // Khởi tạo danh sách HKD
+      const tabs = document.querySelectorAll('.tab-button');
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          showTab(tab.getAttribute('onclick').match(/showTab\('([^']+)'\)/)[1], tab, selectedBusinessId);
+        });
+      });
+    });
+  </script>
   <script src="script.js"></script>
 </body>
 </html>
