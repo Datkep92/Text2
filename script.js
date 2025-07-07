@@ -33,16 +33,16 @@ function saveCurrentState() {
         lastActiveBusinessId: lastActiveBusinessId,
         timestamp: new Date().toISOString()
     };
-    
+
     // Lưu vào localStorage để khôi phục sau này
     localStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(currentState));
-    
+
     // Thêm vào undo stack (giới hạn 20 bước)
     undoStack.unshift(currentState);
     if (undoStack.length > MAX_UNDO_STEPS) {
         undoStack.pop();
     }
-    
+
     return currentState;
 }
 
@@ -54,20 +54,20 @@ function restorePreviousSession() {
                 alert('Không tìm thấy dữ liệu phiên làm việc trước!');
                 return;
             }
-            
+
             const previousState = JSON.parse(savedState);
             businesses = previousState.businesses;
             invoices = previousState.invoices;
             inventory = previousState.inventory;
             exportedInvoices = previousState.exportedInvoices;
             lastActiveBusinessId = previousState.lastActiveBusinessId;
-            
+
             // Cập nhật localStorage
             localStorage.setItem('businesses', JSON.stringify(businesses));
             localStorage.setItem('invoices', JSON.stringify(invoices));
             localStorage.setItem('inventory', JSON.stringify(inventory));
             localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
-            
+
             // Cập nhật giao diện
             updateBusinessList();
             if (lastActiveBusinessId) {
@@ -75,9 +75,9 @@ function restorePreviousSession() {
             } else if (businesses.length > 0) {
                 showBusinessDetails(businesses[0].id);
             }
-            
+
             alert('Đã khôi phục trạng thái phiên làm việc trước!');
-            
+
             // Ghi log
             logActivity('system', 'Khôi phục phiên làm việc trước');
         }
@@ -93,26 +93,26 @@ function undoLastAction() {
             alert('Không có thao tác nào để hoàn tác!');
             return;
         }
-        
+
         const previousState = undoStack[0]; // Xem trước trạng thái
         const businessNames = previousState.businesses.map(b => b.name).join(', ');
-        
+
         if (confirm(`Bạn có chắc muốn hoàn tác thao tác gần nhất?\nTrạng thái trước đó có ${previousState.businesses.length} HKD: ${businessNames}`)) {
             const stateToRestore = undoStack.shift();
-            
+
             // Khôi phục từng phần dữ liệu
             businesses = stateToRestore.businesses;
             invoices = stateToRestore.invoices;
             inventory = stateToRestore.inventory;
             exportedInvoices = stateToRestore.exportedInvoices;
             lastActiveBusinessId = stateToRestore.lastActiveBusinessId;
-            
+
             // Cập nhật localStorage
             localStorage.setItem('businesses', JSON.stringify(businesses));
             localStorage.setItem('invoices', JSON.stringify(invoices));
             localStorage.setItem('inventory', JSON.stringify(inventory));
             localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
-            
+
             // Cập nhật giao diện
             updateBusinessList();
             if (lastActiveBusinessId) {
@@ -120,9 +120,9 @@ function undoLastAction() {
             } else if (businesses.length > 0) {
                 showBusinessDetails(businesses[0].id);
             }
-            
+
             alert(`Đã hoàn tác thành công! Còn ${undoStack.length} lần hoàn tác.`);
-            
+
             logActivity('system', 'Hoàn tác thao tác', {
                 restoredBusinesses: businesses.length,
                 restoredInvoices: invoices.length
@@ -137,7 +137,7 @@ function undoLastAction() {
 //ghi log
 function exportLogsToExcel() {
     try {
-        const filteredLogs = selectedBusinessId 
+        const filteredLogs = selectedBusinessId
             ? activityLogs.filter(log => log.businessId === selectedBusinessId)
             : activityLogs;
 
@@ -186,10 +186,10 @@ function logActivity(action, details = {}) {
         details,
         businessId: selectedBusinessId || null
     };
-    
+
     activityLogs.unshift(logEntry); // Thêm vào đầu mảng để mới nhất lên đầu
     localStorage.setItem('activityLogs', JSON.stringify(activityLogs));
-    
+
     // Nếu tab log đang mở thì cập nhật UI
     if (document.getElementById('activityLogTab') && !document.getElementById('activityLogTab').classList.contains('hidden')) {
         showActivityLogTab();
@@ -204,13 +204,13 @@ try {
     exportedInvoices = JSON.parse(localStorage.getItem('exportedInvoices')) || [];
     activityLogs = JSON.parse(localStorage.getItem('activityLogs')) || []; // Thêm dòng này
 
-    
+
     // Khôi phục HKD đang làm việc gần nhất nếu có
     const lastBusiness = businesses[0]; // Mặc định lấy HKD đầu tiên
     if (lastBusiness) {
         lastActiveBusinessId = lastBusiness.id;
     }
-// Lưu trạng thái ban đầu
+    // Lưu trạng thái ban đầu
     saveCurrentState();
 } catch (e) {
     console.error('Lỗi khi đọc localStorage:', e);
@@ -240,7 +240,7 @@ function showActivityLogTab() {
     if (!logTab) return;
 
     // Lọc log theo business đang chọn (nếu có)
-    const filteredLogs = selectedBusinessId 
+    const filteredLogs = selectedBusinessId
         ? activityLogs.filter(log => log.businessId === selectedBusinessId)
         : activityLogs;
 
@@ -290,9 +290,9 @@ function getActionDescription(action) {
 
 function getActionDetails(details) {
     if (!details) return '';
-    
+
     if (typeof details === 'string') return details;
-    
+
     return Object.entries(details)
         .map(([key, value]) => `${key}: ${value}`)
         .join(', ');
@@ -326,10 +326,6 @@ function getTodayDDMMYYYY() {
     return `${day}/${month}/${year}`;
 }
 
-function calculateSellingPrice(cost) {
-    const price = cost * 1.10 + 3000;
-    return Math.ceil(price / 500) * 500;
-}
 
 
 
@@ -391,7 +387,7 @@ function parseToTable(businessId, file, info, direction) {
         taxRate: info.taxRate || '10',
         totalDiscount: info.totalDiscount || 0
     };
-logActivity('invoice_upload', {
+    logActivity('invoice_upload', {
         mccqt: info.mccqt,
         invoiceNumber: info.so,
         itemCount: invoice.items.length,
@@ -437,25 +433,25 @@ logActivity('invoice_upload', {
         }
 
         name = name.replace(/^mại\s*/i, '').replace(/^vụ\s*/i, '');
-        
+
         // Tính toán thành tiền chính xác
         const quantity = normalizeNumber(qty);
         const unitPrice = normalizeNumber(price);
         const discountAmount = normalizeNumber(discount);
         const itemTotal = (quantity * unitPrice) - discountAmount;
 
-        const item = { 
-            stt, 
-            type, 
-            name, 
-            unit, 
-            qty, 
-            price, 
-            discount, 
-            vat, 
-            total: formatMoney(itemTotal) 
+        const item = {
+            stt,
+            type,
+            name,
+            unit,
+            qty,
+            price,
+            discount,
+            vat,
+            total: formatMoney(itemTotal)
         };
-        
+
         rows.push(item);
         invoice.items.push(item);
 
@@ -620,10 +616,11 @@ function showBusinessInventory(businessId) {
             const qty = normalizeNumber(i.qty);
             const taxAmount = price * vatRate * qty;
             i.total = formatMoney(qty * price);
-            i.taxAmount = formatMoney(taxAmount); // ST thuế
-            i.totalAfterTax = formatMoney((price * qty) + taxAmount); // TT sau thuế
+            i.taxAmount = formatMoney(taxAmount);
+            i.totalAfterTax = formatMoney((price * qty) + taxAmount);
             totalQty += qty;
             totalMoney += (price * qty) + taxAmount;
+            console.log('Hiển thị item:', { id: i.id, name: i.name, price: i.price, giaBan: i.giaBan });
         });
 
         const warnings = checkInventoryWarnings(inv);
@@ -653,7 +650,7 @@ function showBusinessInventory(businessId) {
                                 <td data-field="unit" ${i.isEditing ? 'contenteditable="true"' : ''}>${i.unit}</td>
                                 <td data-field="qty" ${i.isEditing ? 'contenteditable="true"' : ''}>${i.qty}</td>
                                 <td data-field="price" ${i.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(i.price)}</td>
-                                <td data-field="giaBan" ${i.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(i.giaBan)}</td>
+                                <td data-field="giaBan" ${i.isEditing ? 'contenteditable="true"' : ''}>${i.giaBan || formatMoney(calculateSellingPrice(normalizeNumber(i.price)))}</td>
                                 <td data-field="vat" ${i.isEditing ? 'contenteditable="true"' : ''}>${i.vat}</td>
                                 <td>${i.total}</td>
                                 <td>${i.taxAmount}</td>
@@ -685,7 +682,7 @@ function updateBusinessList(selectedId = null) {
         console.error('Không tìm thấy #businessList trong DOM');
         return;
     }
-    
+
     try {
         // Sắp xếp: HKD đang làm việc lên đầu, các HKD khác theo thứ tự bình thường
         const sortedBusinesses = [...businesses].sort((a, b) => {
@@ -701,7 +698,7 @@ function updateBusinessList(selectedId = null) {
                 <button onclick="deleteBusiness('${b.id}', event)">Xóa</button>
             </li>
         `).join('') + '</ul>';
-        
+
         localStorage.setItem('businesses', JSON.stringify(businesses));
     } catch (e) {
         console.error('Lỗi updateBusinessList:', e);
@@ -719,21 +716,21 @@ function deleteBusiness(businessId, event) {
         if (confirm('Bạn có chắc muốn xóa Hộ Kinh Doanh này? Tất cả dữ liệu liên quan (hóa đơn, tồn kho) cũng sẽ bị xóa.')) {
             // LƯU TRẠNG THÁI HIỆN TẠI TRƯỚC KHI XÓA
             const currentState = saveCurrentState();
-            
+
             // Xóa tất cả dữ liệu liên quan
             invoices = invoices.filter(i => i.businessId !== businessId);
             inventory = inventory.filter(i => i.businessId !== businessId);
             exportedInvoices = exportedInvoices.filter(i => i.businessId !== businessId);
-            
+
             // Xóa HKD khỏi danh sách
             businesses = businesses.filter(b => b.id !== businessId);
-            
+
             // Cập nhật localStorage
             localStorage.setItem('businesses', JSON.stringify(businesses));
             localStorage.setItem('invoices', JSON.stringify(invoices));
             localStorage.setItem('inventory', JSON.stringify(inventory));
             localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
-            
+
             // Cập nhật giao diện
             updateBusinessList();
             document.getElementById('businessDetails').innerHTML = '<h4>Quản lý Hộ Kinh Doanh</h4>';
@@ -758,7 +755,7 @@ function showActivityLogPopup() {
             existingPopup.remove();
             return;
         }
-        const filteredLogs = selectedBusinessId 
+        const filteredLogs = selectedBusinessId
             ? activityLogs.filter(log => log.businessId === selectedBusinessId)
             : activityLogs;
         const popupContent = `
@@ -797,7 +794,7 @@ function showActivityLogPopup() {
         popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 999; display: flex; justify-content: center; align-items: center;';
         popup.innerHTML = popupContent;
         document.body.appendChild(popup);
-        popup.addEventListener('click', function(e) {
+        popup.addEventListener('click', function (e) {
             if (e.target === popup) {
                 closePopup('activityLogPopup');
             }
@@ -823,23 +820,28 @@ function updateInventory(businessId, item, direction) {
         const qtyChange = normalizeNumber(item.qty) * (direction === 'input' ? 1 : -1);
         const vat = item.vat || '10%';
         const vatRate = parseFloat(vat.replace('%', '')) / 100;
-        
+
+        const percentage = parseFloat(localStorage.getItem('sellingPricePercentage')) || 0.10;
+        const fixedAmount = parseFloat(localStorage.getItem('sellingPriceFixedAmount')) || 3000;
+        console.log('updateInventory:', { businessId, itemName: item.name, direction, percentage, fixedAmount });
+
         if (invItem) {
             invItem.qty = normalizeNumber(invItem.qty) + qtyChange;
             invItem.price = item.price;
             invItem.discount = item.discount || '0';
             invItem.vat = vat;
-            
+
             const price = normalizeNumber(invItem.price);
             const qty = normalizeNumber(invItem.qty);
             const taxAmount = price * vatRate * qty;
-            
+
             invItem.total = formatMoney(qty * price);
             invItem.taxAmount = formatMoney(taxAmount);
             invItem.totalAfterTax = formatMoney((price * qty) + taxAmount);
-            invItem.giaBan = calculateSellingPrice(price);
+            invItem.giaBan = formatMoney(calculateSellingPrice(price));
             invItem.lastUpdated = new Date().toISOString();
-            
+            console.log('Cập nhật item tồn kho:', { id: invItem.id, name: invItem.name, giaBan: invItem.giaBan });
+
             if (invItem.qty <= 0) {
                 inventory = inventory.filter(i => i.id !== invItem.id);
             }
@@ -847,8 +849,8 @@ function updateInventory(businessId, item, direction) {
             const basePrice = normalizeNumber(item.price);
             const qty = qtyChange;
             const taxAmount = basePrice * vatRate * qty;
-            
-            inventory.push({
+
+            const newItem = {
                 id: generateUUID(),
                 businessId,
                 stt: item.stt || (inventory.length + 1).toString(),
@@ -862,11 +864,23 @@ function updateInventory(businessId, item, direction) {
                 total: formatMoney(qty * basePrice),
                 taxAmount: formatMoney(taxAmount),
                 totalAfterTax: formatMoney((basePrice * qty) + taxAmount),
-                giaBan: calculateSellingPrice(basePrice),
+                giaBan: formatMoney(calculateSellingPrice(basePrice)),
                 lastUpdated: new Date().toISOString()
-            });
+            };
+            inventory.push(newItem);
+            console.log('Thêm item mới vào tồn kho:', { id: newItem.id, name: newItem.name, giaBan: newItem.giaBan });
         }
+
         localStorage.setItem('inventory', JSON.stringify(inventory));
+
+        logActivity('inventory_update', {
+            businessId,
+            itemName: item.name,
+            direction,
+            qtyChange,
+            percentage,
+            fixedAmount
+        });
     } catch (e) {
         console.error('Lỗi updateInventory:', e);
     }
@@ -907,17 +921,17 @@ function deleteInventoryItem(itemId, businessId) {
 
 function editInventoryItem(itemId, businessId) {
     try {
-    saveCurrentState();
+        saveCurrentState();
         // Reset trạng thái chỉnh sửa cho tất cả items trước
         inventory.forEach(item => {
             item.isEditing = item.id === itemId;
         });
-        
+
         localStorage.setItem('inventory', JSON.stringify(inventory));
-        
+
         // Cập nhật giao diện
         showBusinessInventory(businessId);
-        
+
         // Tự động focus vào ô đầu tiên có thể chỉnh sửa
         setTimeout(() => {
             const row = document.querySelector(`tr[data-item-id="${itemId}"]`);
@@ -954,15 +968,15 @@ function saveOrCancelInventoryItem(itemId, businessId, action) {
                 price: row.querySelector('td[data-field="price"]').textContent.trim() || '0',
                 vat: row.querySelector('td[data-field="vat"]').textContent.trim() || '10%'
             };
-            
+
             if (!fields.name || isNaN(normalizeNumber(fields.qty)) || isNaN(normalizeNumber(fields.price))) {
                 alert('Vui lòng nhập đầy đủ Tên hàng hóa, Số lượng và Đơn giá hợp lệ!');
                 return;
             }
-            
+
             fields.vat = fields.vat.includes('%') ? fields.vat : `${fields.vat}%`;
             fields.price = normalizeNumber(fields.price).toString();
-            
+
             const oldQty = normalizeNumber(item.qty);
             const qtyChange = normalizeNumber(fields.qty) - oldQty;
             const vatRate = parseFloat(fields.vat.replace('%', '')) / 100;
@@ -977,7 +991,7 @@ function saveOrCancelInventoryItem(itemId, businessId, action) {
             item.isEditing = false;
             item.lastUpdated = new Date().toISOString();
 
-             logActivity('inventory_update', {
+            logActivity('inventory_update', {
                 itemId: itemId,
                 businessId: businessId,
                 action: 'edit',
@@ -988,7 +1002,7 @@ function saveOrCancelInventoryItem(itemId, businessId, action) {
             });
 
             localStorage.setItem('inventory', JSON.stringify(inventory));
-        
+
         } else {
             item.isEditing = false;
         }
@@ -1040,170 +1054,6 @@ function insertInventoryItem(businessId, afterId) {
 // 6. QUẢN LÝ HÓA ĐƠN (INVOICES)
 // =============================================
 
-function showInvoiceDetails(invoiceId) {
-    try {
-        const invoice = invoices.find(i => i.id === invoiceId);
-        if (!invoice) {
-            console.error(`Không tìm thấy hóa đơn với ID ${invoiceId}`);
-            alert('Hóa đơn không tồn tại!');
-            return;
-        }
-
-        const businessInvoices = invoices.filter(i => i.businessId === invoice.businessId)
-            .sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-        const currentIndex = businessInvoices.findIndex(i => i.id === invoiceId);
-        const prevInvoiceId = currentIndex > 0 ? businessInvoices[currentIndex - 1].id : null;
-        const nextInvoiceId = currentIndex < businessInvoices.length - 1 ? businessInvoices[currentIndex + 1].id : null;
-
-        // Tính toán các giá trị tổng theo logic mới
-        let totalBeforeTax = 0;
-        let totalTax = 0;
-        let totalDiscount = 0;
-        let totalPayment = 0;
-        let totalSelling = 0;
-
-        invoice.items.forEach(item => {
-            const qty = normalizeNumber(item.qty);
-            const price = normalizeNumber(item.price);
-            const discount = normalizeNumber(item.discount || '0');
-            const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
-            
-            // Tính toán giống như trong getBusinessInventorySummary
-            const itemTotalBeforeTax = qty * price - discount;
-            const itemTax = itemTotalBeforeTax * vatRate;
-            const itemTotal = itemTotalBeforeTax + itemTax;
-            
-            totalBeforeTax += itemTotalBeforeTax;
-            totalTax += itemTax;
-            totalDiscount += discount;
-            totalPayment += itemTotal;
-            totalSelling += qty * calculateSellingPrice(price);
-        });
-
-        const invoiceTable = `
-            <div class="invoice-details-table">
-                <h4>Trích xuất hóa đơn ${invoice.series}-${invoice.number}</h4>
-                <table class="compact-table">
-                    <thead>
-                        <tr>
-                            <th>STT</th>
-                            <th>Tên hàng hóa</th>
-                            <th>Đơn vị</th>
-                            <th>Số lượng</th>
-                            <th>Đơn giá</th>
-                            <th>Chiết khấu</th>
-                            <th>Thuế suất</th>
-                            <th>Tiền thuế</th>
-                            <th>Thành tiền (đã bao gồm thuế)</th>
-                            <th>Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${invoice.items.map((item, index) => {
-                            const qty = normalizeNumber(item.qty);
-                            const price = normalizeNumber(item.price);
-                            const discount = normalizeNumber(item.discount || '0');
-                            const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
-                            
-                            // Tính toán giống như trong getBusinessInventorySummary
-                            const itemTotalBeforeTax = qty * price - discount;
-                            const itemTax = itemTotalBeforeTax * vatRate;
-                            const itemTotal = itemTotalBeforeTax + itemTax;
-                            const itemSelling = qty * calculateSellingPrice(price);
-                            
-                            return `
-                                <tr data-item-index="${index}" class="${item.isEditing ? 'editing' : ''}">
-                                    <td>${item.stt}</td>
-                                    <td data-field="name" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.name}</td>
-                                    <td data-field="unit" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.unit}</td>
-                                    <td data-field="qty" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.qty}</td>
-                                    <td data-field="price" ${item.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(item.price)}</td>
-                                    <td data-field="discount" ${item.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(item.discount || '0')}</td>
-                                    <td data-field="vat" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.vat || invoice.taxRate + '%'}</td>
-                                    <td>${formatMoney(itemTax)}</td>
-                                    <td>${formatMoney(itemTotal)}</td>
-                                    <td>
-                                        ${item.isEditing ? `
-                                            <button onclick="saveOrCancelInvoiceItem('${invoiceId}', ${index}, 'save')">💾</button>
-                                            <button onclick="saveOrCancelInvoiceItem('${invoiceId}', ${index}, 'cancel')">❌</button>
-                                        ` : `
-                                            <button onclick="editInvoiceItem('${invoiceId}', ${index})">✏️</button>
-                                            <button onclick="insertInvoiceItem('${invoiceId}', ${index})">➕</button>
-                                            <button onclick="deleteInvoiceItem('${invoiceId}', ${index})">🗑️</button>
-                                        `}
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-                
-                <div class="invoice-summary">
-                    <div class="summary-row">
-                        <span>Tổng tiền chưa thuế:</span>
-                        <span>${formatMoney(totalBeforeTax)} VND</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Tổng cộng tiền thuế:</span>
-                        <span>${formatMoney(totalTax)} VND</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Tổng tiền chiết khấu:</span>
-                        <span>${formatMoney(totalDiscount)} VND</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Tổng giá trị bán:</span>
-                        <span>${formatMoney(totalSelling)} VND</span>
-                    </div>
-                    <div class="summary-row total">
-                        <span>Tổng tiền thanh toán:</span>
-                        <span>${formatMoney(totalPayment)} VND</span>
-                    </div>
-                </div>
-                
-                <button onclick="addInvoiceItem('${invoiceId}')">➕ Thêm dòng hàng hóa</button>
-            </div>
-        `;
-
-        const existingPopup = document.querySelector('.popup');
-        if (existingPopup) existingPopup.remove();
-
-        const popup = document.createElement('div');
-        popup.className = 'popup';
-        popup.innerHTML = `
-            <div class="popup-content">
-                <span class="close-popup" onclick="this.parentElement.parentElement.remove()">❌</span>
-                <div class="invoice-comparison">
-                    <div class="invoice-pdf">
-                        <h4>Hóa đơn PDF</h4>
-                        <div class="pdf-container">
-                            <iframe src="${invoice.file || '#'}" width="100%" height="500px"></iframe>
-                            <div class="magnifier"></div>
-                        </div>
-                    </div>
-                    ${invoiceTable}
-                    <div class="invoice-navigation" style="margin-top: 20px;">
-                        <button ${!prevInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${prevInvoiceId}')">⬅️ Hóa đơn trước</button>
-                        <button onclick="restoreInvoiceToSuccess('${invoiceId}')">🔄 Khôi phục sang thành công</button>
-                        <button ${!nextInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${nextInvoiceId}')">Hóa đơn tiếp theo ➡️</button>
-
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(popup);
-        setupMagnifier();
-
-        popup.addEventListener('click', (e) => {
-            if (e.target === popup) {
-                popup.remove();
-            }
-        });
-    } catch (e) {
-        console.error('Lỗi showInvoiceDetails:', e);
-        alert('Lỗi khi hiển thị hóa đơn: ' + e.message);
-    }
-}
 
 // Giữ nguyên hàm checkInvoiceItem từ code mới
 function checkInvoiceItem(item) {
@@ -1223,14 +1073,14 @@ function editInvoiceItem(invoiceId, itemIndex) {
         invoice.items.forEach(item => {
             item.isEditing = false;
         });
-        
+
         // Bật chế độ chỉnh sửa cho item được chọn
         invoice.items[itemIndex].isEditing = true;
         localStorage.setItem('invoices', JSON.stringify(invoices));
-        
+
         // Hiển thị lại
         showInvoiceDetails(invoiceId);
-        
+
         // Focus vào ô đầu tiên có thể chỉnh sửa (cải tiến)
         setTimeout(() => {
             const popup = document.querySelector('.popup');
@@ -1238,7 +1088,7 @@ function editInvoiceItem(invoiceId, itemIndex) {
                 const editableCell = popup.querySelector(`tr[data-item-index="${itemIndex}"] [contenteditable="true"]`);
                 if (editableCell) {
                     editableCell.focus();
-                    
+
                     // Chọn toàn bộ nội dung để dễ sửa
                     const range = document.createRange();
                     range.selectNodeContents(editableCell);
@@ -1297,111 +1147,6 @@ function editInvoiceItem(invoiceId, itemIndex) {
     } catch (e) {
         console.error('Lỗi editInvoiceItem:', e);
         alert('Lỗi khi chỉnh sửa mục hóa đơn: ' + e.message);
-    }
-}
-function saveOrCancelInvoiceItem(invoiceId, itemIndex, action) {
-    try {
-        const invoice = invoices.find(i => i.id === invoiceId);
-        if (!invoice) {
-            console.error(`Không tìm thấy hóa đơn với ID ${invoiceId}`);
-            alert('Hóa đơn không tồn tại!');
-            return;
-        }
-        const item = invoice.items[itemIndex];
-        if (!item) {
-            console.error(`Không tìm thấy mục hóa đơn tại index ${itemIndex}`);
-            alert('Mục hóa đơn không tồn tại!');
-            return;
-        }
-        if (action === 'save') {
-            const row = document.querySelector(`tr[data-item-index="${itemIndex}"]`);
-            if (!row) {
-                console.error(`Không tìm thấy hàng với data-item-index ${itemIndex}`);
-                alert('Không tìm thấy hàng để lưu!');
-                return;
-            }
-            const fields = {
-                name: row.querySelector('td[data-field="name"]').textContent.trim() || 'Hàng hóa mới',
-                unit: row.querySelector('td[data-field="unit"]').textContent.trim() || 'Cái',
-                qty: row.querySelector('td[data-field="qty"]').textContent.trim() || '0',
-                price: row.querySelector('td[data-field="price"]').textContent.trim() || '0',
-                discount: row.querySelector('td[data-field="discount"]').textContent.trim() || '0',
-                vat: row.querySelector('td[data-field="vat"]').textContent.trim() || invoice.taxRate + '%'
-            };
-
-            if (!fields.name || isNaN(normalizeNumber(fields.qty)) || isNaN(normalizeNumber(fields.price))) {
-                alert('Vui lòng nhập đầy đủ Tên hàng hóa, Số lượng và Đơn giá hợp lệ!');
-                return;
-            }
-
-            fields.vat = fields.vat.includes('%') ? fields.vat : `${fields.vat}%`;
-            fields.price = normalizeNumber(fields.price).toString();
-            fields.discount = normalizeNumber(fields.discount).toString();
-
-            const oldQty = normalizeNumber(item.qty);
-            const qtyChange = normalizeNumber(fields.qty) - oldQty;
-            const vatRate = parseFloat(fields.vat.replace('%', '')) / 100;
-            const price = normalizeNumber(fields.price);
-            const qty = normalizeNumber(fields.qty);
-            const discount = normalizeNumber(fields.discount);
-            const itemTotalBeforeTax = qty * price - discount;
-            const itemTax = itemTotalBeforeTax * vatRate;
-            const itemTotal = itemTotalBeforeTax + itemTax;
-
-            Object.assign(item, {
-                ...fields,
-                total: formatMoney(itemTotal),
-                isEditing: false,
-                lastUpdated: new Date().toISOString()
-            });
-
-            if (item.type === 'Hàng hóa, dịch vụ' && qtyChange !== 0) {
-                updateInventory(invoice.businessId, {
-                    name: fields.name,
-                    unit: fields.unit,
-                    qty: qtyChange.toString(),
-                    price: fields.price,
-                    discount: fields.discount,
-                    vat: fields.vat,
-                    total: itemTotal.toString()
-                }, invoice.direction);
-            }
-
-            invoice.netTotal = invoice.items.reduce((sum, item) => {
-                const qty = normalizeNumber(item.qty);
-                const price = normalizeNumber(item.price);
-                const discount = normalizeNumber(item.discount || '0');
-                return sum + (qty * price - discount);
-            }, 0);
-
-            invoice.totalTax = invoice.items.reduce((sum, item) => {
-                const qty = normalizeNumber(item.qty);
-                const price = normalizeNumber(item.price);
-                const discount = normalizeNumber(item.discount || '0');
-                const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
-                return sum + ((qty * price - discount) * vatRate);
-            }, 0);
-
-            invoice.totalDiscount = invoice.items.reduce((sum, item) => sum + normalizeNumber(item.discount || '0'), 0);
-
-            localStorage.setItem('invoices', JSON.stringify(invoices));
-            localStorage.setItem('inventory', JSON.stringify(inventory));
-        } else {
-            if (!item.id && item.isEditing) {
-                invoice.items.splice(itemIndex, 1);
-                invoice.items.forEach((item, idx) => item.stt = (idx + 1).toString());
-                localStorage.setItem('invoices', JSON.stringify(invoices));
-            } else {
-                item.isEditing = false;
-            }
-        }
-        showInvoiceDetails(invoiceId);
-        showBusinessDetails(invoice.businessId);
-        showPriceList(invoice.businessId);
-        showExportHistory(invoice.businessId);
-    } catch (e) {
-        console.error('Lỗi saveOrCancelInvoiceItem:', e);
-        alert('Lỗi khi lưu mục hóa đơn: ' + e.message);
     }
 }
 
@@ -1548,23 +1293,25 @@ function saveOrCancelInvoiceItem(invoiceId, itemIndex, action) {
         const invoice = invoices.find(i => i.id === invoiceId);
         if (!invoice) {
             console.error(`Không tìm thấy hóa đơn với ID ${invoiceId}`);
+            alert('Hóa đơn không tồn tại!');
             return;
         }
-        
+
         const item = invoice.items[itemIndex];
         if (!item) {
             console.error(`Không tìm thấy mục hóa đơn tại index ${itemIndex}`);
+            alert('Mục hóa đơn không tồn tại!');
             return;
         }
-        
+
         if (action === 'save') {
             const row = document.querySelector(`tr[data-item-index="${itemIndex}"]`);
             if (!row) {
                 console.error(`Không tìm thấy hàng với data-item-index ${itemIndex}`);
+                alert('Không tìm thấy hàng để lưu!');
                 return;
             }
-            
-            // Lấy giá trị từ các ô editable
+
             const fields = {
                 name: row.querySelector('td[data-field="name"]').textContent.trim() || 'Hàng hóa mới',
                 unit: row.querySelector('td[data-field="unit"]').textContent.trim() || 'Cái',
@@ -1573,37 +1320,33 @@ function saveOrCancelInvoiceItem(invoiceId, itemIndex, action) {
                 discount: row.querySelector('td[data-field="discount"]').textContent.trim() || '0',
                 vat: row.querySelector('td[data-field="vat"]').textContent.trim() || invoice.taxRate + '%'
             };
-            
-            // Validate dữ liệu
+
             if (!fields.name || isNaN(normalizeNumber(fields.qty)) || isNaN(normalizeNumber(fields.price))) {
                 alert('Vui lòng nhập đầy đủ Tên hàng hóa, Số lượng và Đơn giá hợp lệ!');
                 return;
             }
-            
-            // Chuẩn hóa dữ liệu
+
             fields.vat = fields.vat.includes('%') ? fields.vat : `${fields.vat}%`;
             fields.price = normalizeNumber(fields.price).toString();
             fields.discount = normalizeNumber(fields.discount).toString();
-            
-            // Tính toán giá trị mới
+
             const oldQty = normalizeNumber(item.qty);
             const qtyChange = normalizeNumber(fields.qty) - oldQty;
             const vatRate = parseFloat(fields.vat.replace('%', '')) / 100;
             const price = normalizeNumber(fields.price);
             const qty = normalizeNumber(fields.qty);
             const discount = normalizeNumber(fields.discount);
-            
             const itemTotalBeforeTax = qty * price - discount;
             const itemTax = itemTotalBeforeTax * vatRate;
             const itemTotal = itemTotalBeforeTax + itemTax;
-            
-            // Cập nhật item
-            Object.assign(item, fields);
-            item.total = formatMoney(itemTotal);
-            item.isEditing = false;
-            item.lastUpdated = new Date().toISOString();
-            
-            // Cập nhật tồn kho nếu là hàng hóa, dịch vụ
+
+            Object.assign(item, {
+                ...fields,
+                total: formatMoney(itemTotal),
+                isEditing: false,
+                lastUpdated: new Date().toISOString()
+            });
+
             if (item.type === 'Hàng hóa, dịch vụ' && qtyChange !== 0) {
                 updateInventory(invoice.businessId, {
                     name: fields.name,
@@ -1615,15 +1358,15 @@ function saveOrCancelInvoiceItem(invoiceId, itemIndex, action) {
                     total: itemTotal.toString()
                 }, invoice.direction);
             }
-            
-            // Tính toán lại tổng tiền hóa đơn
+
+            // Tính lại tổng
             invoice.netTotal = invoice.items.reduce((sum, item) => {
                 const qty = normalizeNumber(item.qty);
                 const price = normalizeNumber(item.price);
                 const discount = normalizeNumber(item.discount || '0');
                 return sum + (qty * price - discount);
             }, 0);
-            
+
             invoice.totalTax = invoice.items.reduce((sum, item) => {
                 const qty = normalizeNumber(item.qty);
                 const price = normalizeNumber(item.price);
@@ -1631,23 +1374,34 @@ function saveOrCancelInvoiceItem(invoiceId, itemIndex, action) {
                 const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
                 return sum + ((qty * price - discount) * vatRate);
             }, 0);
-            
+
             invoice.totalDiscount = invoice.items.reduce((sum, item) => sum + normalizeNumber(item.discount || '0'), 0);
-            
-            // Lưu vào localStorage
+
             localStorage.setItem('invoices', JSON.stringify(invoices));
             localStorage.setItem('inventory', JSON.stringify(inventory));
-        } else {
-            // Nếu là cancel và item mới thêm (chưa có id)
+        } else if (action === 'cancel') {
+            // Trường hợp hủy chỉnh sửa
             if (!item.id && item.isEditing) {
-                invoice.items.splice(itemIndex, 1);
-                localStorage.setItem('invoices', JSON.stringify(invoices));
+                // Nếu là dòng mới, xác nhận trước khi xóa
+                const isEmpty =
+                    !item.name?.trim() &&
+                    !item.unit?.trim() &&
+                    normalizeNumber(item.qty) === 0 &&
+                    normalizeNumber(item.price) === 0;
+
+                if (isEmpty || confirm('Bạn có chắc muốn xóa dòng mới này không?')) {
+                    invoice.items.splice(itemIndex, 1);
+                    invoice.items.forEach((item, idx) => item.stt = (idx + 1).toString());
+                    localStorage.setItem('invoices', JSON.stringify(invoices));
+                } else {
+                    item.isEditing = false;
+                }
             } else {
                 item.isEditing = false;
             }
         }
-        
-        // Hiển thị lại chi tiết hóa đơn
+
+        // Cập nhật giao diện
         showInvoiceDetails(invoiceId);
         showBusinessDetails(invoice.businessId);
         showPriceList(invoice.businessId);
@@ -1661,19 +1415,19 @@ function saveOrCancelInvoiceItem(invoiceId, itemIndex, action) {
 function deleteInvoiceItem(invoiceId, itemIndex) {
     try {
         if (!confirm('Bạn có chắc muốn xóa mục hóa đơn này?')) return;
-        
+
         const invoice = invoices.find(i => i.id === invoiceId);
         if (!invoice) {
             console.error(`Không tìm thấy hóa đơn với ID ${invoiceId}`);
             return;
         }
-        
+
         const item = invoice.items[itemIndex];
         if (!item) {
             console.error(`Không tìm thấy mục hóa đơn tại index ${itemIndex}`);
             return;
         }
-        
+
         if (item.type === 'Hàng hóa, dịch vụ') {
             updateInventory(invoice.businessId, {
                 name: item.name,
@@ -1685,10 +1439,10 @@ function deleteInvoiceItem(invoiceId, itemIndex) {
                 total: item.total
             }, invoice.direction === 'input' ? 'output' : 'input');
         }
-        
+
         invoice.items.splice(itemIndex, 1);
         invoice.items.forEach((item, idx) => item.stt = (idx + 1).toString());
-        
+
         // Tính toán lại tổng
         invoice.netTotal = invoice.items.reduce((sum, item) => {
             const qty = normalizeNumber(item.qty);
@@ -1696,7 +1450,7 @@ function deleteInvoiceItem(invoiceId, itemIndex) {
             const discount = normalizeNumber(item.discount || '0');
             return sum + (qty * price - discount);
         }, 0);
-        
+
         invoice.totalTax = invoice.items.reduce((sum, item) => {
             const qty = normalizeNumber(item.qty);
             const price = normalizeNumber(item.price);
@@ -1704,12 +1458,12 @@ function deleteInvoiceItem(invoiceId, itemIndex) {
             const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
             return sum + ((qty * price - discount) * vatRate);
         }, 0);
-        
+
         invoice.totalDiscount = invoice.items.reduce((sum, item) => sum + normalizeNumber(item.discount || '0'), 0);
-        
+
         localStorage.setItem('invoices', JSON.stringify(invoices));
         localStorage.setItem('inventory', JSON.stringify(inventory));
-        
+
         showInvoiceDetails(invoiceId);
         showBusinessDetails(invoice.businessId);
         showPriceList(invoice.businessId);
@@ -1720,17 +1474,7 @@ function deleteInvoiceItem(invoiceId, itemIndex) {
     }
 }
 
-function navigateInvoice(invoiceId) {
-    try {
-        if (!invoiceId) return;
-        const popup = document.querySelector('.popup');
-        if (popup) popup.remove();
-        showInvoiceDetails(invoiceId);
-    } catch (e) {
-        console.error('Lỗi navigateInvoice:', e);
-        alert('Lỗi khi chuyển hướng hóa đơn: ' + e.message);
-    }
-}
+
 
 function setupMagnifier() {
     const pdfContainer = document.querySelector('.pdf-container');
@@ -1762,7 +1506,7 @@ function setupMagnifier() {
 function filterInvoices(filterType, businessId) {
     try {
         let filtered = invoices.filter(i => i.businessId === businessId);
-        
+
         if (filterType === 'input') {
             filtered = filtered.filter(i => i.direction === 'input');
         } else if (filterType === 'output') {
@@ -1784,7 +1528,7 @@ function filterInvoices(filterType, businessId) {
                     const sellingPrice = calculateSellingPrice(normalizeNumber(item.price));
                     return sum + (normalizeNumber(item.qty) * sellingPrice);
                 }, 0);
-                
+
                 return `
                     <tr style="background-color: ${statusColor}">
                         <td>${invoice.series}-${invoice.number}</td>
@@ -1857,7 +1601,7 @@ function showInvoicesTab(businessId) {
 }
 
 function getStatusIcon(statusColor) {
-    switch(statusColor) {
+    switch (statusColor) {
         case 'white': return '✅';
         case 'yellow': return '⚠️';
         case 'red': return '❌';
@@ -1870,16 +1614,16 @@ function filterInvoicesByType(type, businessId) {
     const buttons = document.querySelectorAll('.filter-buttons button');
     buttons.forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
-    
+
     loadInvoiceList(businessId, type);
 }
 
 // Hàm tải danh sách hóa đơn
 function loadInvoiceList(businessId, filterType = 'all') {
     let filtered = invoices.filter(i => i.businessId === businessId);
-    
+
     // Áp dụng bộ lọc
-    switch(filterType) {
+    switch (filterType) {
         case 'valid':
             filtered = filtered.filter(inv => checkInvoice(inv) === 'white');
             break;
@@ -1891,10 +1635,10 @@ function loadInvoiceList(businessId, filterType = 'all') {
             break;
         // 'all' không lọc
     }
-    
+
     // Sắp xếp theo ngày mới nhất
     filtered.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-    
+
     // Hiển thị kết quả
     const container = document.getElementById('invoiceListContainer');
     if (container) {
@@ -1905,7 +1649,7 @@ function loadInvoiceList(businessId, filterType = 'all') {
 // Hàm render danh sách hóa đơn
 function renderInvoiceList(invoices) {
     if (invoices.length === 0) return '<p>Không tìm thấy hóa đơn nào</p>';
-    
+
     return `
         <table class="invoice-table">
             <thead>
@@ -1921,8 +1665,8 @@ function renderInvoiceList(invoices) {
             </thead>
             <tbody>
                 ${invoices.map(invoice => {
-                    const status = checkInvoice(invoice);
-                    return `
+        const status = checkInvoice(invoice);
+        return `
                         <tr class="invoice-row ${status}">
                             <td>${invoice.series}-${invoice.number}</td>
                             <td>${new Date(invoice.uploadDate).toLocaleDateString()}</td>
@@ -1932,16 +1676,15 @@ function renderInvoiceList(invoices) {
                             <td>${getStatusBadge(status)}</td>
                             <td class="actions">
                                 <button onclick="showInvoiceDetails('${invoice.id}')">Xem</button>
-                                <button onclick="exportInvoiceToExcel('${invoice.id}')">Xuất Excel</button>
+                                <button onclick="deleteInvoice('${invoice.id}', '${invoice.businessId}')">Xóa</button>
                             </td>
                         </tr>
                     `;
-                }).join('')}
+    }).join('')}
             </tbody>
         </table>
     `;
 }
-
 // Hàm tìm kiếm nâng cao
 function showAdvancedSearch(businessId) {
     const popup = document.createElement('div');
@@ -1989,9 +1732,9 @@ function applyAdvancedSearch(businessId) {
     const type = document.getElementById('searchInvoiceType').value;
     const minAmount = normalizeNumber(document.getElementById('searchMinAmount').value) || 0;
     const maxAmount = normalizeNumber(document.getElementById('searchMaxAmount').value) || Infinity;
-    
+
     let filtered = invoices.filter(i => i.businessId === businessId);
-    
+
     // Áp dụng các điều kiện lọc
     if (fromDate) {
         filtered = filtered.filter(i => new Date(i.uploadDate) >= new Date(fromDate));
@@ -2006,13 +1749,13 @@ function applyAdvancedSearch(businessId) {
         const total = calculateInvoiceTotal(i);
         return total >= minAmount && total <= maxAmount;
     });
-    
+
     // Hiển thị kết quả
     const container = document.getElementById('invoiceListContainer');
     if (container) {
         container.innerHTML = renderInvoiceList(filtered);
     }
-    
+
     // Đóng popup
     document.querySelector('.popup')?.remove();
 }
@@ -2035,7 +1778,7 @@ function calculateInvoiceTotal(invoice) {
         const price = normalizeNumber(item.price);
         const discount = normalizeNumber(item.discount || '0');
         const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
-        
+
         total += (qty * price - discount) * (1 + vatRate);
     });
     return total;
@@ -2105,7 +1848,7 @@ function deleteInvoice(id, event) {
         if (!invoice) return;
 
         if (confirm('Bạn có chắc muốn xóa hóa đơn này?')) {
-logActivity('invoice_delete', {
+            logActivity('invoice_delete', {
                 invoiceId: id,
                 invoiceNumber: `${invoice.series}-${invoice.number}`,
                 businessId: invoice.businessId,
@@ -2159,16 +1902,16 @@ function checkInvoice(invoice) {
         const price = normalizeNumber(item.price);
         const discount = normalizeNumber(item.discount || '0');
         const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
-        
+
         const itemTotalBeforeTax = qty * price - discount;
         const itemTax = itemTotalBeforeTax * vatRate;
         const itemTotal = itemTotalBeforeTax + itemTax;
-        
+
         // PHÁT HIỆN CẢNH BÁO MỚI
         if (qty > 0 && itemTotal <= 0) {
             hasWarning = true; // Số lượng >0 nhưng thành tiền <=0
         }
-        
+
         totalInvoice += itemTotal;
     });
 
@@ -2186,19 +1929,732 @@ function checkInvoice(invoice) {
 // =============================================
 // 7. QUẢN LÝ XUẤT HÀNG (EXPORT) - Sửa lại toàn bộ
 // =============================================
+// Hàm tạo tên khách hàng ngẫu nhiên
 function randomCustomerName() {
-    const firstNames = ['Nguyễn Văn', 'Trần Thị', 'Lê Văn', 'Phạm Thị', 'Hoàng Văn'];
-    const lastNames = ['An', 'Bình', 'Cường', 'Đạt', 'Hùng'];
-    return `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+    const firstNames = ['Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Huỳnh', 'Võ', 'Đặng', 'Bùi', 'Đỗ'];
+    const middleNames = ['Văn', 'Thị', 'Hữu', 'Minh', 'Ngọc', 'Quốc', 'Thành', 'Hoài', 'Đức', ''];
+    const lastNames = ['Hùng', 'Lan', 'Anh', 'Dũng', 'Hương', 'Nam', 'Mai', 'Bình', 'Tâm', 'Phúc'];
+    const first = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const middle = middleNames[Math.floor(Math.random() * middleNames.length)];
+    const last = lastNames[Math.floor(Math.random() * lastNames.length)];
+    return `${first} ${middle} ${last}`.trim();
 }
 
+// Hàm tạo địa chỉ ngẫu nhiên tại Ninh Thuận
 function randomAddressNinhThuan() {
-    const wards = ['Phường Đài Sơn', 'Phường Phước Mỹ', 'Xã Thành Hải', 'Xã Vĩnh Hải'];
-    const districts = ['Thành phố Phan Rang - Tháp Chàm', 'Huyện Ninh Phước', 'Huyện Ninh Sơn'];
+    const streets = ['Lê Lợi', 'Nguyễn Trãi', 'Trần Hưng Đạo', 'Hùng Vương', 'Ngô Gia Tự'];
+    const wards = ['Phước Mỹ', 'Tấn Tài', 'Kinh Dinh', 'Mỹ Hải', 'Phủ Hà'];
+    const street = streets[Math.floor(Math.random() * streets.length)];
     const ward = wards[Math.floor(Math.random() * wards.length)];
-    const district = districts[Math.floor(Math.random() * districts.length)];
-    return `${ward}, ${district}, Tỉnh Ninh Thuận`;
+    return `Đường ${street}, ${ward}, Ninh Thuận`;
 }
+
+function exportManualInvoice(businessId) {
+    try {
+        const customerName = document.getElementById('manualCustomerName')?.value || 'Khách lẻ';
+        const customerAddress = document.getElementById('manualCustomerAddress')?.value || '';
+        const customerPhone = document.getElementById('manualCustomerPhone')?.value || '';
+        const customerTaxCode = document.getElementById('manualCustomerTaxCode')?.value || '';
+
+        const tbody = document.getElementById('manualInvoiceItemsBody');
+        if (!tbody) throw new Error('Không tìm thấy danh sách hàng hóa');
+
+        const items = Array.from(tbody.querySelectorAll('tr')).map(row => {
+            const select = row.querySelector('.item-select');
+            const qtyInput = row.querySelector('.item-qty');
+            if (!select?.value || !qtyInput?.value) return null;
+
+            const invItem = inventory.find(i => i.id === select.value);
+            if (!invItem) return null;
+
+            const qty = normalizeNumber(qtyInput.value);
+            const price = normalizeNumber(select.selectedOptions[0].dataset.price);
+            const vat = invItem.vat || '10%';
+
+            return {
+                id: invItem.id,
+                name: invItem.name,
+                unit: invItem.unit,
+                qty: qty.toString(),
+                price: price.toString(),
+                total: (qty * price).toString(),
+                vat: vat
+            };
+        }).filter(item => item !== null);
+
+        if (items.length === 0) {
+            alert('Không có hàng hóa hợp lệ để xuất Excel!');
+            return;
+        }
+
+        const grandTotal = items.reduce((sum, item) => sum + normalizeNumber(item.total), 0);
+        const rows = [headers];
+
+        // Dòng đầu tiên (thông tin chung)
+        const headerRow = Array(headers.length).fill('');
+        headerRow[0] = 1; // STT
+        headerRow[1] = getTodayDDMMYYYY(); // NgayHoaDon
+        headerRow[2] = `KH${Math.floor(Math.random() * 1000) + 1000}`; // MaKhachHang
+        headerRow[3] = customerName; // TenKhachHang
+        headerRow[4] = customerName; // TenNguoiMua
+        headerRow[5] = customerTaxCode; // MaSoThue
+        headerRow[6] = customerAddress; // DiaChiKhachHang
+        headerRow[7] = customerPhone; // DienThoaiKhachHang
+        headerRow[10] = 'TM'; // HinhThucTT
+        if (items.length > 0) {
+            headerRow[11] = items[0].id; // MaSanPham
+            headerRow[12] = items[0].name; // SanPham
+            headerRow[13] = items[0].unit; // DonViTinh
+            headerRow[16] = items[0].qty; // SoLuong
+            headerRow[17] = items[0].price; // DonGia
+            headerRow[20] = items[0].total; // ThanhTien
+            headerRow[22] = items[0].vat; // ThueSuat
+            headerRow[23] = formatMoney(normalizeNumber(items[0].total) * (parseFloat(items[0].vat.replace('%', '')) / 100)); // TienThueSanPham
+        }
+        headerRow[24] = formatMoney(items.reduce((sum, item) =>
+            sum + (normalizeNumber(item.total) * (parseFloat(item.vat.replace('%', '')) / 100)), 0)); // TienThue
+        headerRow[26] = formatMoney(grandTotal); // TongCong
+        headerRow[28] = 'VND'; // DonViTienTe
+        headerRow[55] = 'mau_01'; // mau_01
+        rows.push(headerRow);
+
+        // Các dòng sản phẩm
+        items.forEach((item, index) => {
+            const rowData = Array(headers.length).fill('');
+            rowData[0] = index + 2; // STT
+            rowData[1] = getTodayDDMMYYYY(); // NgayHoaDon
+            rowData[2] = `KH${Math.floor(Math.random() * 1000) + 1000}`; // MaKhachHang
+            rowData[10] = 'TM'; // HinhThucTT
+            rowData[11] = item.id; // MaSanPham
+            rowData[12] = item.name; // SanPham
+            rowData[13] = item.unit; // DonViTinh
+            rowData[16] = item.qty; // SoLuong
+            rowData[17] = item.price; // DonGia
+            rowData[20] = item.total; // ThanhTien
+            rowData[22] = item.vat; // ThueSuat
+            rowData[23] = formatMoney(normalizeNumber(item.total) * (parseFloat(item.vat.replace('%', '')) / 100)); // TienThueSanPham
+            rowData[26] = item.total; // TongCong
+            rowData[28] = 'VND'; // DonViTienTe
+            rowData[55] = 'mau_01'; // mau_01
+            rows.push(rowData);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'HoaDonThuCong');
+        XLSX.writeFile(wb, `HoaDonThuCong_${businessId}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (e) {
+        console.error('Lỗi exportManualInvoice:', e);
+        alert('Lỗi khi xuất Excel: ' + e.message);
+    }
+}
+
+function autoExport(businessId) {
+    try {
+        const inv = inventory.filter(i => i.businessId === businessId && normalizeNumber(i.qty) > 0);
+        if (inv.length === 0) {
+            alert('Không có hàng hóa trong tồn kho để xuất!');
+            return;
+        }
+
+        // Chọn ngẫu nhiên 1-3 mặt hàng
+        const itemCount = Math.floor(Math.random() * 3) + 1;
+        const selectedItems = [];
+        const shuffledInv = inv.sort(() => Math.random() - 0.5).slice(0, itemCount);
+
+        const items = shuffledInv.map((invItem, index) => {
+            const maxQty = normalizeNumber(invItem.qty);
+            const qty = Math.floor(Math.random() * maxQty) + 1; // Số lượng ngẫu nhiên từ 1 đến maxQty
+            const price = normalizeNumber(invItem.price);
+            const vat = invItem.vat || '10%';
+            const vatRate = parseFloat(vat.replace('%', '')) / 100;
+            const itemTotal = qty * price;
+            const taxAmount = itemTotal * vatRate;
+
+            return {
+                stt: (index + 1).toString(),
+                name: invItem.name,
+                unit: invItem.unit,
+                qty: qty.toString(),
+                price: price.toString(),
+                discount: '0',
+                vat,
+                total: formatMoney(itemTotal),
+                taxAmount: formatMoney(taxAmount),
+                totalAfterTax: formatMoney(itemTotal + taxAmount),
+                giaBan: invItem.giaBan || formatMoney(calculateSellingPrice(price)),
+                itemId: invItem.id
+            };
+        });
+
+        const customerName = randomCustomerName();
+        const customerAddress = randomAddressNinhThuan();
+        const customerPhone = '';
+        const customerTaxCode = '';
+
+        // Tạo và xuất Excel
+        const rows = [headers];
+        const grandTotal = items.reduce((sum, item) => sum + normalizeNumber(item.totalAfterTax), 0);
+
+        // Dòng đầu tiên (thông tin chung)
+        const headerRow = Array(headers.length).fill('');
+        headerRow[0] = 1; // STT
+        headerRow[1] = getTodayDDMMYYYY(); // NgayHoaDon
+        headerRow[2] = `KH${Math.floor(Math.random() * 1000) + 1000}`; // MaKhachHang
+        headerRow[3] = customerName; // TenKhachHang
+        headerRow[4] = customerName; // TenNguoiMua
+        headerRow[5] = customerTaxCode; // MaSoThue
+        headerRow[6] = customerAddress; // DiaChiKhachHang
+        headerRow[7] = customerPhone; // DienThoaiKhachHang
+        headerRow[10] = 'TM'; // HinhThucTT
+        if (items.length > 0) {
+            headerRow[11] = items[0].itemId; // MaSanPham
+            headerRow[12] = items[0].name; // SanPham
+            headerRow[13] = items[0].unit; // DonViTinh
+            headerRow[16] = items[0].qty; // SoLuong
+            headerRow[17] = items[0].price; // DonGia
+            headerRow[20] = items[0].total; // ThanhTien
+            headerRow[22] = items[0].vat; // ThueSuat
+            headerRow[23] = items[0].taxAmount; // TienThueSanPham
+        }
+        headerRow[24] = formatMoney(items.reduce((sum, item) => sum + normalizeNumber(item.taxAmount), 0)); // TienThue
+        headerRow[26] = formatMoney(grandTotal); // TongCong
+        headerRow[28] = 'VND'; // DonViTienTe
+        headerRow[55] = 'mau_01'; // mau_01
+        rows.push(headerRow);
+
+        // Các dòng sản phẩm
+        items.forEach((item, index) => {
+            const rowData = Array(headers.length).fill('');
+            rowData[0] = index + 2; // STT
+            rowData[1] = getTodayDDMMYYYY(); // NgayHoaDon
+            rowData[2] = `KH${Math.floor(Math.random() * 1000) + 1000}`; // MaKhachHang
+            rowData[10] = 'TM'; // HinhThucTT
+            rowData[11] = item.itemId; // MaSanPham
+            rowData[12] = item.name; // SanPham
+            rowData[13] = item.unit; // DonViTinh
+            rowData[16] = item.qty; // SoLuong
+            rowData[17] = item.price; // DonGia
+            rowData[20] = item.total; // ThanhTien
+            rowData[22] = item.vat; // ThueSuat
+            rowData[23] = item.taxAmount; // TienThueSanPham
+            rowData[26] = item.totalAfterTax; // TongCong
+            rowData[28] = 'VND'; // DonViTienTe
+            rowData[55] = 'mau_01'; // mau_01
+            rows.push(rowData);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'HoaDonTuDong');
+        XLSX.writeFile(wb, `HoaDonTuDong_${businessId}_${Date.now()}.xlsx`);
+
+        // Lưu trạng thái
+        saveCurrentState();
+
+        // Tạo hóa đơn mới
+        const invoiceId = generateUUID();
+        const invoice = {
+            id: invoiceId,
+            businessId,
+            series: 'A' + Date.now().toString().slice(-6),
+            number: Math.floor(1000 + Math.random() * 9000).toString(),
+            direction: 'output',
+            uploadDate: new Date().toISOString(),
+            mccqt: '',
+            customerName,
+            customerAddress,
+            customerPhone,
+            customerTaxCode,
+            items,
+            taxRate: '10%',
+            totalTax: items.reduce((sum, item) => sum + normalizeNumber(item.taxAmount), 0),
+            netTotal: items.reduce((sum, item) => sum + normalizeNumber(item.total), 0),
+            totalDiscount: 0
+        };
+
+        // Cập nhật tồn kho
+        items.forEach(item => {
+            updateInventory(businessId, item, 'output');
+        });
+
+        // Lưu vào invoices
+        invoices.push(invoice);
+        localStorage.setItem('invoices', JSON.stringify(invoices));
+
+        // Lưu vào lịch sử xuất hàng
+        const exportRecord = {
+            id: generateUUID(),
+            businessId,
+            exportCode: 'EXP-' + Date.now(),
+            exportDate: new Date().toISOString(),
+            customerName,
+            customerAddress,
+            customerPhone,
+            customerTaxCode,
+            items: items.map(item => ({
+                name: item.name,
+                unit: item.unit,
+                qty: item.qty,
+                price: item.price,
+                total: item.total
+            })),
+            grandTotal: formatMoney(invoice.netTotal + invoice.totalTax),
+            type: 'auto'
+        };
+        exportedInvoices.push(exportRecord);
+        localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
+
+        // Ghi log hoạt động
+        logActivity('invoice_auto_add', {
+            invoiceId,
+            businessId,
+            invoiceNumber: invoice.series + '-' + invoice.number,
+            customerName
+        });
+        logActivity('export_auto', {
+            exportId: exportRecord.id,
+            businessId,
+            invoiceId,
+            totalAmount: exportRecord.grandTotal
+        });
+
+        alert('Xuất hàng tự động và lưu hóa đơn thành công!');
+        showBusinessDetails(businessId);
+    } catch (e) {
+        console.error('Lỗi autoExport:', e);
+        alert('Lỗi khi xuất tự động: ' + e.message);
+    }
+}
+
+function showManualSalesExportPopup(businessId) {
+    try {
+        const inv = inventory.filter(i => i.businessId === businessId && normalizeNumber(i.qty) > 0);
+        if (inv.length === 0) {
+            alert('Không có hàng hóa trong tồn kho để xuất!');
+            return;
+        }
+
+        // Chọn ngẫu nhiên 1-3 mặt hàng
+        const itemCount = Math.floor(Math.random() * 3) + 1;
+        const selectedItems = inv.sort(() => Math.random() - 0.5).slice(0, itemCount).map((invItem, index) => {
+            const maxQty = normalizeNumber(invItem.qty);
+            const qty = Math.floor(Math.random() * maxQty) + 1;
+            const price = normalizeNumber(invItem.price);
+            const vat = invItem.vat || '10%';
+            const vatRate = parseFloat(vat.replace('%', '')) / 100;
+            const itemTotal = qty * price;
+            const taxAmount = itemTotal * vatRate;
+
+            return {
+                stt: (index + 1).toString(),
+                name: invItem.name,
+                unit: invItem.unit,
+                qty: qty.toString(),
+                price: price.toString(),
+                discount: '0',
+                vat,
+                total: formatMoney(itemTotal),
+                taxAmount: formatMoney(taxAmount),
+                totalAfterTax: formatMoney(itemTotal + taxAmount),
+                giaBan: invItem.giaBan || formatMoney(calculateSellingPrice(price)),
+                itemId: invItem.id
+            };
+        });
+
+        // Tạo popup
+        const popup = document.createElement('div');
+        popup.className = 'popup';
+        popup.innerHTML = `
+            <div class="popup-content" style="max-width: 1260px;">
+                <span class="close-popup" onclick="this.parentElement.parentElement.remove()">❌</span>
+                <h4>Xuất bán thủ công</h4>
+                
+                <div class="customer-info">
+                    <div class="form-group">
+                        <label>Họ tên khách hàng:</label>
+                        <input type="text" id="manualSalesCustomerName" placeholder="Nhập họ tên">
+                    </div>
+                    <div class="form-group">
+                        <label>Địa chỉ:</label>
+                        <input type="text" id="manualSalesCustomerAddress" placeholder="Nhập địa chỉ">
+                    </div>
+                    <div class="form-group">
+                        <label>Số điện thoại:</label>
+                        <input type="text" id="manualSalesCustomerPhone" placeholder="Nhập số điện thoại">
+                    </div>
+                    <div class="form-group">
+                        <label>Mã số thuế (nếu có):</label>
+                        <input type="text" id="manualSalesCustomerTaxCode" placeholder="Nhập MST">
+                    </div>
+                </div>
+                
+                <div class="invoice-items">
+                    <h5>Bảng kê hàng hóa (tự động chọn)</h5>
+                    <table class="compact-table">
+                        <thead>
+                            <tr>
+                                <th>STT</th>
+                                <th>Tên hàng hóa</th>
+                                <th>Đơn vị</th>
+                                <th>Số lượng tồn</th>
+                                <th>Số lượng xuất</th>
+                                <th>Đơn giá</th>
+                                <th>Thành tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody id="manualSalesItemsBody">
+                            ${selectedItems.map(item => `
+                                <tr>
+                                    <td>${item.stt}</td>
+                                    <td>${item.name}</td>
+                                    <td>${item.unit}</td>
+                                    <td>${inv.find(i => i.id === item.itemId).qty}</td>
+                                    <td>${item.qty}</td>
+                                    <td>${formatMoney(item.price)}</td>
+                                    <td>${item.total}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="invoice-summary">
+                    <div>Tổng tiền: <span id="manualSalesTotal">${formatMoney(selectedItems.reduce((sum, item) => sum + normalizeNumber(item.totalAfterTax), 0))}</span> VND</div>
+                </div>
+                
+                <div class="form-actions">
+                    <button onclick="saveManualSalesExport('${businessId}')" class="primary">💾 Lưu và xuất Excel</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(popup);
+    } catch (e) {
+        console.error('Lỗi showManualSalesExportPopup:', e);
+        alert('Lỗi khi tạo popup xuất bán thủ công: ' + e.message);
+    }
+}
+
+function saveManualSalesExport(businessId) {
+    try {
+        const customerNameInput = document.getElementById('manualSalesCustomerName');
+        const customerAddressInput = document.getElementById('manualSalesCustomerAddress');
+        const customerPhoneInput = document.getElementById('manualSalesCustomerPhone');
+        const customerTaxCodeInput = document.getElementById('manualSalesCustomerTaxCode');
+
+        if (!customerNameInput || !customerAddressInput || !customerPhoneInput || !customerTaxCodeInput) {
+            throw new Error('Không tìm thấy các trường thông tin khách hàng trong DOM');
+        }
+
+        const customerName = customerNameInput.value.trim() || 'Khách hàng lẻ';
+        const customerAddress = customerAddressInput.value.trim() || '';
+        const customerPhone = customerPhoneInput.value.trim() || '';
+        const customerTaxCode = customerTaxCodeInput.value.trim() || '';
+
+        const tbody = document.getElementById('manualSalesItemsBody');
+        if (!tbody) {
+            throw new Error('Không tìm thấy #manualSalesItemsBody');
+        }
+
+        const items = Array.from(tbody.querySelectorAll('tr')).map((row, index) => {
+            const name = row.cells[1].textContent;
+            const invItem = inventory.find(i => i.businessId === businessId && i.name === name);
+            if (!invItem) return null;
+
+            const qty = normalizeNumber(row.cells[4].textContent);
+            const price = normalizeNumber(row.cells[5].textContent);
+            const vat = invItem.vat || '10%';
+            const vatRate = parseFloat(vat.replace('%', '')) / 100;
+            const itemTotal = qty * price;
+            const taxAmount = itemTotal * vatRate;
+
+            return {
+                stt: (index + 1).toString(),
+                name: invItem.name,
+                unit: invItem.unit,
+                qty: qty.toString(),
+                price: price.toString(),
+                discount: '0',
+                vat,
+                total: formatMoney(itemTotal),
+                taxAmount: formatMoney(taxAmount),
+                totalAfterTax: formatMoney(itemTotal + taxAmount),
+                giaBan: invItem.giaBan || formatMoney(calculateSellingPrice(price)),
+                itemId: invItem.id
+            };
+        }).filter(item => item !== null);
+
+        if (items.length === 0) {
+            alert('Không có hàng hóa hợp lệ để xuất!');
+            return;
+        }
+
+        // Kiểm tra số lượng tồn kho
+        for (const item of items) {
+            const invItem = inventory.find(i => i.businessId === businessId && i.name === item.name);
+            if (!invItem || normalizeNumber(invItem.qty) < normalizeNumber(item.qty)) {
+                alert(`Số lượng xuất cho ${item.name} vượt quá tồn kho!`);
+                return;
+            }
+        }
+
+        // Xuất Excel trước
+        const rows = [headers];
+        const grandTotal = items.reduce((sum, item) => sum + normalizeNumber(item.totalAfterTax), 0);
+
+        // Dòng đầu tiên (thông tin chung)
+        const headerRow = Array(headers.length).fill('');
+        headerRow[0] = 1; // STT
+        headerRow[1] = getTodayDDMMYYYY(); // NgayHoaDon
+        headerRow[2] = `KH${Math.floor(Math.random() * 1000) + 1000}`; // MaKhachHang
+        headerRow[3] = customerName; // TenKhachHang
+        headerRow[4] = customerName; // TenNguoiMua
+        headerRow[5] = customerTaxCode; // MaSoThue
+        headerRow[6] = customerAddress; // DiaChiKhachHang
+        headerRow[7] = customerPhone; // DienThoaiKhachHang
+        headerRow[10] = 'TM'; // HinhThucTT
+        if (items.length > 0) {
+            headerRow[11] = items[0].itemId; // MaSanPham
+            headerRow[12] = items[0].name; // SanPham
+            headerRow[13] = items[0].unit; // DonViTinh
+            headerRow[16] = items[0].qty; // SoLuong
+            headerRow[17] = items[0].price; // DonGia
+            headerRow[20] = items[0].total; // ThanhTien
+            headerRow[22] = items[0].vat; // ThueSuat
+            headerRow[23] = items[0].taxAmount; // TienThueSanPham
+        }
+        headerRow[24] = formatMoney(items.reduce((sum, item) => sum + normalizeNumber(item.taxAmount), 0)); // TienThue
+        headerRow[26] = formatMoney(grandTotal); // TongCong
+        headerRow[28] = 'VND'; // DonViTienTe
+        headerRow[55] = 'mau_01'; // mau_01
+        rows.push(headerRow);
+
+        // Các dòng sản phẩm
+        items.forEach((item, index) => {
+            const rowData = Array(headers.length).fill('');
+            rowData[0] = index + 2; // STT
+            rowData[1] = getTodayDDMMYYYY(); // NgayHoaDon
+            rowData[2] = `KH${Math.floor(Math.random() * 1000) + 1000}`; // MaKhachHang
+            rowData[10] = 'TM'; // HinhThucTT
+            rowData[11] = item.itemId; // MaSanPham
+            rowData[12] = item.name; // SanPham
+            rowData[13] = item.unit; // DonViTinh
+            rowData[16] = item.qty; // SoLuong
+            rowData[17] = item.price; // DonGia
+            rowData[20] = item.total; // ThanhTien
+            rowData[22] = item.vat; // ThueSuat
+            rowData[23] = item.taxAmount; // TienThueSanPham
+            rowData[26] = item.totalAfterTax; // TongCong
+            rowData[28] = 'VND'; // DonViTienTe
+            rowData[55] = 'mau_01'; // mau_01
+            rows.push(rowData);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'HoaDonBanThuCong');
+        XLSX.writeFile(wb, `HoaDonBanThuCong_${businessId}_${Date.now()}.xlsx`);
+
+        // Lưu trạng thái
+        saveCurrentState();
+
+        // Tạo hóa đơn mới
+        const invoiceId = generateUUID();
+        const invoice = {
+            id: invoiceId,
+            businessId,
+            series: 'S' + Date.now().toString().slice(-6),
+            number: Math.floor(1000 + Math.random() * 9000).toString(),
+            direction: 'output',
+            uploadDate: new Date().toISOString(),
+            mccqt: '',
+            customerName,
+            customerAddress,
+            customerPhone,
+            customerTaxCode,
+            items,
+            taxRate: '10%',
+            totalTax: items.reduce((sum, item) => sum + normalizeNumber(item.taxAmount), 0),
+            netTotal: items.reduce((sum, item) => sum + normalizeNumber(item.total), 0),
+            totalDiscount: 0
+        };
+
+        // Cập nhật tồn kho
+        items.forEach(item => {
+            updateInventory(businessId, item, 'output');
+        });
+
+        // Lưu vào invoices
+        invoices.push(invoice);
+        localStorage.setItem('invoices', JSON.stringify(invoices));
+
+        // Lưu vào lịch sử xuất hàng
+        const exportRecord = {
+            id: generateUUID(),
+            businessId,
+            exportCode: 'EXP-' + Date.now(),
+            exportDate: new Date().toISOString(),
+            customerName,
+            customerAddress,
+            customerPhone,
+            customerTaxCode,
+            items: items.map(item => ({
+                name: item.name,
+                unit: item.unit,
+                qty: item.qty,
+                price: item.price,
+                total: item.total
+            })),
+            grandTotal: formatMoney(invoice.netTotal + invoice.totalTax),
+            type: 'manual_sales'
+        };
+        exportedInvoices.push(exportRecord);
+        localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
+
+        // Ghi log hoạt động
+        logActivity('invoice_manual_sales_add', {
+            invoiceId,
+            businessId,
+            invoiceNumber: invoice.series + '-' + invoice.number,
+            customerName
+        });
+        logActivity('export_manual_sales', {
+            exportId: exportRecord.id,
+            businessId,
+            invoiceId,
+            totalAmount: exportRecord.grandTotal
+        });
+
+        alert('Xuất bán thủ công và lưu hóa đơn thành công!');
+        document.querySelector('.popup').remove();
+        showBusinessDetails(businessId);
+    } catch (e) {
+        console.error('Lỗi saveManualSalesExport:', e);
+        alert('Lỗi khi xuất bán thủ công: ' + e.message);
+    }
+}
+
+
+function saveManualInvoice(businessId) {
+    try {
+        saveCurrentState();
+
+        const customerName = document.getElementById('manualCustomerName')?.value || 'Khách lẻ';
+        const customerAddress = document.getElementById('manualCustomerAddress')?.value || '';
+        const customerPhone = document.getElementById('manualCustomerPhone')?.value || '';
+        const customerTaxCode = document.getElementById('manualCustomerTaxCode')?.value || '';
+
+        const tbody = document.getElementById('manualInvoiceItemsBody');
+        if (!tbody) throw new Error('Không tìm thấy danh sách hàng hóa');
+
+        const items = Array.from(tbody.querySelectorAll('tr')).map(row => {
+            const select = row.querySelector('.item-select');
+            const qtyInput = row.querySelector('.item-qty');
+            if (!select?.value || !qtyInput?.value) return null;
+
+            const invItem = inventory.find(i => i.id === select.value);
+            if (!invItem) return null;
+
+            const qty = normalizeNumber(qtyInput.value);
+            const price = normalizeNumber(select.selectedOptions[0].dataset.price);
+            const vat = invItem.vat || '10%';
+
+            return {
+                id: invItem.id,
+                name: invItem.name,
+                unit: invItem.unit,
+                qty: qty.toString(),
+                price: price.toString(),
+                total: (qty * price).toString(),
+                vat: vat
+            };
+        }).filter(item => item !== null);
+
+        if (items.length === 0) {
+            alert('Vui lòng thêm ít nhất một hàng hóa hợp lệ!');
+            return;
+        }
+
+        // Kiểm tra tồn kho
+        for (const item of items) {
+            const invItem = inventory.find(i => i.id === item.id);
+            if (!invItem || normalizeNumber(invItem.qty) < normalizeNumber(item.qty)) {
+                alert(`Số lượng xuất ${item.qty} vượt quá tồn kho ${invItem?.qty || 0} của ${item.name}`);
+                return;
+            }
+        }
+
+        // Xuất Excel trước
+        exportManualInvoice(businessId);
+
+        // Tạo hồ sơ xuất hàng
+        const exportRecord = {
+            id: generateUUID(),
+            businessId,
+            exportCode: 'EXP-MAN-' + Date.now().toString().slice(-6),
+            exportDate: new Date().toISOString(),
+            customerName,
+            customerAddress,
+            customerPhone,
+            customerTaxCode,
+            items,
+            grandTotal: items.reduce((sum, item) => sum + normalizeNumber(item.total), 0).toString(),
+            type: 'manual'
+        };
+
+        // Cập nhật tồn kho
+        items.forEach(item => {
+            updateInventory(businessId, item, 'output');
+        });
+
+        // Lưu vào lịch sử
+        exportedInvoices.push(exportRecord);
+        localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
+
+        // Tạo hóa đơn
+        const invoice = {
+            id: generateUUID(),
+            businessId,
+            series: 'M' + Date.now().toString().slice(-6),
+            number: Math.floor(1000 + Math.random() * 9000).toString(),
+            direction: 'output',
+            uploadDate: new Date().toISOString(),
+            customerName,
+            customerAddress,
+            customerPhone,
+            customerTaxCode,
+            items,
+            taxRate: '10%',
+            totalTax: items.reduce((sum, item) => {
+                const vatRate = parseFloat(item.vat.replace('%', '')) / 100;
+                return sum + (normalizeNumber(item.total) * vatRate);
+            }, 0),
+            netTotal: exportRecord.grandTotal,
+            totalDiscount: 0
+        };
+
+        invoices.push(invoice);
+        localStorage.setItem('invoices', JSON.stringify(invoices));
+
+        // Ghi log
+        logActivity('export_manual', {
+            exportId: exportRecord.id,
+            businessId,
+            invoiceId: invoice.id,
+            totalAmount: exportRecord.grandTotal,
+            itemCount: items.length
+        });
+
+        alert('Xuất hàng thủ công thành công!');
+        document.querySelector('.popup')?.remove();
+        showExportHistory(businessId);
+    } catch (e) {
+        console.error('Lỗi saveManualInvoice:', e);
+        alert('Lỗi khi xuất hàng thủ công: ' + e.message);
+    }
+}
+
 
 function validateTargetAmount(businessId) {
     try {
@@ -2330,37 +2786,44 @@ function removeExportItem(itemId, businessId) {
 
 function saveExport(businessId) {
     try {
-    saveCurrentState();
+        saveCurrentState(); // Lưu trạng thái hiện tại trước khi thay đổi
+
         const tbody = document.getElementById('exportItemsBodyContent');
         if (!tbody || tbody.querySelectorAll('tr').length === 0) {
-            console.error('Không tìm thấy #exportItemsBodyContent hoặc bảng trống');
             alert('Vui lòng tạo danh sách xuất trước khi lưu!');
             return;
         }
 
+        const customerName = document.getElementById('customerName')?.value || 'Khách lẻ';
+        const customerAddress = document.getElementById('customerAddress')?.value || '';
+        const customerPhone = document.getElementById('customerPhone')?.value || '';
+        const customerTaxCode = document.getElementById('customerTaxCode')?.value || '';
+
         const items = [];
         Array.from(tbody.querySelectorAll('tr')).forEach(row => {
             const checkbox = row.querySelector('.export-checkbox');
-            const itemId = row.getAttribute('data-item-id');
-            const item = inventory.find(i => i.id === itemId && i.businessId === businessId);
-            const qtyInput = row.querySelector('.export-qty');
-            const qty = normalizeNumber(qtyInput?.value) || 0;
-            const sellingPrice = normalizeNumber(row.cells[5].innerText.replace(/[^\d.,]/g, '')) || 0;
-            const totalCell = row.querySelector('.export-total');
+            if (checkbox && checkbox.checked) {
+                const itemId = row.getAttribute('data-item-id');
+                const item = inventory.find(i => i.id === itemId && i.businessId === businessId);
+                const qty = normalizeNumber(row.querySelector('.export-qty')?.value) || 0;
+                const price = normalizeNumber(row.cells[5].innerText.replace(/[^\d.,]/g, '')) || 0;
 
-            if (item && checkbox && checkbox.checked && qty > 0) {
-                if (qty > normalizeNumber(item.qty)) {
-                    alert(`Số lượng xuất (${qty}) vượt quá tồn kho (${item.qty}) cho ${item.name}!`);
-                    throw new Error('Số lượng xuất không hợp lệ');
+                if (item && qty > 0) {
+                    if (qty > normalizeNumber(item.qty)) {
+                        alert(`Số lượng xuất (${qty}) vượt quá tồn kho (${item.qty}) cho ${item.name}!`);
+                        throw new Error('Số lượng xuất không hợp lệ');
+                    }
+
+                    items.push({
+                        id: itemId,
+                        name: item.name,
+                        unit: item.unit,
+                        qty: qty.toString(),
+                        price: price.toString(),
+                        total: (qty * price).toString(),
+                        vat: item.vat || '10%'
+                    });
                 }
-                items.push({
-                    id: itemId,
-                    name: item.name,
-                    unit: item.unit,
-                    qty: qty.toString(),
-                    price: sellingPrice.toString(),
-                    total: normalizeNumber(totalCell?.innerText.replace(/[^\d.,]/g, '') || (qty * sellingPrice)).toString()
-                });
             }
         });
 
@@ -2370,101 +2833,73 @@ function saveExport(businessId) {
         }
 
         const grandTotal = items.reduce((sum, item) => sum + normalizeNumber(item.total), 0);
+
+        // Tạo hồ sơ xuất hàng
         const exportRecord = {
             id: generateUUID(),
             businessId,
-            exportCode: 'EXP-' + Date.now(),
+            exportCode: 'EXP-' + Date.now().toString().slice(-6),
             exportDate: new Date().toISOString(),
+            customerName,
+            customerAddress,
+            customerPhone,
+            customerTaxCode,
             items,
-            grandTotal: grandTotal.toString()
+            grandTotal: grandTotal.toString(),
+            type: 'auto'
         };
 
+        // Cập nhật tồn kho
+        items.forEach(item => {
+            updateInventory(businessId, item, 'output');
+        });
+
+        // Lưu vào lịch sử
         exportedInvoices.push(exportRecord);
         localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
 
-        items.forEach(item => {
-            const invItem = inventory.find(i => i.id === item.id && i.businessId === businessId);
-            if (invItem) {
-                invItem.qty = (normalizeNumber(invItem.qty) - normalizeNumber(item.qty)).toString();
-                invItem.lastUpdated = new Date().toISOString();
-                if (normalizeNumber(invItem.qty) <= 0) {
-                    inventory = inventory.filter(i => i.id !== invItem.id);
-                }
-            }
-        });
-        localStorage.setItem('inventory', JSON.stringify(inventory));
+        // Tạo hóa đơn
+        const invoice = {
+            id: generateUUID(),
+            businessId,
+            series: 'A' + Date.now().toString().slice(-6),
+            number: Math.floor(1000 + Math.random() * 9000).toString(),
+            direction: 'output',
+            uploadDate: new Date().toISOString(),
+            customerName,
+            customerAddress,
+            customerPhone,
+            customerTaxCode,
+            items,
+            taxRate: '10%',
+            totalTax: items.reduce((sum, item) => {
+                const vatRate = parseFloat(item.vat.replace('%', '')) / 100;
+                return sum + (normalizeNumber(item.total) * vatRate);
+            }, 0),
+            netTotal: grandTotal,
+            totalDiscount: 0
+        };
 
-        // Xuất file Excel sau khi lưu thành công
-        const rows = [headers];
-        const customerNameInput = document.getElementById('customerName')?.value || randomCustomerName();
-        const customerAddressInput = document.getElementById('customerAddress')?.value || randomAddressNinhThuan();
-        let excelGrandTotal = 0;
+        invoices.push(invoice);
+        localStorage.setItem('invoices', JSON.stringify(invoices));
 
-        // Dòng đầu tiên: Thông tin khách hàng và sản phẩm đầu tiên + TongCong
-        const headerRow = Array(headers.length).fill('');
-        headerRow[0] = 1; // STT
-        headerRow[1] = getTodayDDMMYYYY(); // NgayHoaDon
-        headerRow[2] = `KH${Math.floor(Math.random() * 1000) + 1000}`; // MaKhachHang
-        headerRow[3] = customerNameInput; // TenKhachHang
-        headerRow[4] = customerNameInput; // TenNguoiMua
-        headerRow[6] = customerAddressInput; // DiaChiKhachHang
-        headerRow[10] = 'TM'; // HinhThucTT
-        if (items.length > 0) {
-            headerRow[11] = items[0].id; // MaSanPham
-            headerRow[12] = items[0].name; // SanPham
-            headerRow[13] = items[0].unit; // DonViTinh
-            headerRow[16] = items[0].qty; // SoLuong
-            headerRow[17] = parseInt(items[0].price); // DonGia (số nguyên)
-            headerRow[20] = parseInt(items[0].total); // ThanhTien (số nguyên)
-            excelGrandTotal += parseInt(items[0].total);
-        }
-        headerRow[26] = parseInt(grandTotal); // TongCong (số nguyên)
-        headerRow[28] = 'VND'; // DonViTienTe
-        headerRow[55] = 'mau_01'; // mau_01
-        rows.push(headerRow);
-
-        // Các dòng tiếp theo: Thông tin sản phẩm
-        items.forEach((item, index) => {
-            const rowData = Array(headers.length).fill('');
-            rowData[0] = index + 2; // STT
-            rowData[1] = getTodayDDMMYYYY(); // NgayHoaDon
-            rowData[2] = `KH${Math.floor(Math.random() * 1000) + 1000}`; // MaKhachHang
-            rowData[10] = 'TM'; // HinhThucTT
-            rowData[11] = item.id; // MaSanPham
-            rowData[12] = item.name; // SanPham
-            rowData[13] = item.unit; // DonViTinh
-            rowData[16] = item.qty; // SoLuong
-            rowData[17] = parseInt(item.price); // DonGia (số nguyên)
-            rowData[20] = parseInt(item.total); // ThanhTien (số nguyên)
-            rowData[26] = parseInt(item.total); // TongCong (số nguyên)
-            rowData[28] = 'VND'; // DonViTienTe
-            rowData[55] = 'mau_01'; // mau_01
-            rows.push(rowData);
-            excelGrandTotal += parseInt(item.total); // Cộng dồn tổng
+        // Ghi log
+        logActivity('export_auto', {
+            exportId: exportRecord.id,
+            businessId,
+            invoiceId: invoice.id,
+            totalAmount: grandTotal,
+            itemCount: items.length
         });
 
-        // Đảm bảo TongCong dòng đầu tiên khớp với tổng thực tế
-        rows[0][26] = parseInt(excelGrandTotal);
-
-        if (rows.length <= 1) {
-            alert('Không có dữ liệu để xuất!');
-            return;
-        }
-
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'HoaDon');
-        XLSX.writeFile(wb, `HoaDonXuat_${businessId}_${Date.now()}.xlsx`);
-
-        document.getElementById('exportTab').innerHTML = '';
-        alert('Xuất hàng hóa, lưu lịch sử và xuất file Excel thành công!');
+        alert('Xuất hàng tự động thành công!');
+        showExportHistory(businessId);
     } catch (e) {
         console.error('Lỗi saveExport:', e);
-        if (e.message !== 'Số lượng xuất không hợp lệ') {
-            alert('Lỗi khi xuất hàng hóa: ' + e.message);
-        }
+        alert('Lỗi khi xuất hàng: ' + e.message);
     }
 }
+
 
 function exportToExcel(businessId) {
     try {
@@ -2777,130 +3212,42 @@ function exportAutoInvoiceToExcel(businessId) {
 // =============================================
 // 8. GIAO DIỆN HIỂN THỊ
 // =============================================
-function showBusinessDetails(businessId) {
+function showPriceList(businessId) {
     try {
-        // Cập nhật HKD đang làm việc
-        lastActiveBusinessId = businessId;
-        
-        const businessDetails = document.getElementById('businessDetails');
-        if (!businessDetails) return;
-        
-        const business = businesses.find(b => b.id === businessId);
-        if (!business) {
-            businessDetails.innerHTML = '<p>Không tìm thấy Hộ Kinh Doanh.</p>';
+        const priceListTab = document.getElementById('priceListTab');
+        if (!priceListTab) {
+            console.error('Không tìm thấy #priceListTab trong DOM');
             return;
         }
 
-        selectedBusinessId = businessId;
-        updateBusinessList(businessId);
-
-        const inventorySummary = getBusinessInventorySummary(businessId);
-
-        businessDetails.innerHTML = `
-            <div class="business-header">
-                <h3>${business.name}</h3>
-                <div class="business-info">
-                    <span><strong>MST:</strong> ${business.taxCode}</span>
-                    <span><strong>Địa chỉ:</strong> ${business.address}</span>
-                </div>
-                <!-- Thêm nút tạo hóa đơn thủ công vào đây -->
-                <div class="business-actions">
-                    <button onclick="showManualInvoicePopup('${businessId}')" class="btn-manual-invoice">
-                        <span class="icon">📝</span> Tạo hóa đơn thủ công
-                    </button>
-                </div>
-            </div>
-            
-            <div class="summary-cards">
-                <div class="summary-card">
-                    <div class="card-icon">📦</div>
-                    <div>
-                        <div class="card-title">Tồn kho</div>
-                        <div class="card-value">${inventorySummary.totalItems} mặt hàng</div>
-                    </div>
-                </div>
-                <div class="summary-card">
-                    <div class="card-icon">🧮</div>
-                    <div>
-                        <div class="card-title">Tổng số lượng</div>
-                        <div class="card-value">${formatMoney(inventorySummary.totalQuantity)}</div>
-                    </div>
-                </div>
-                <div class="summary-card">
-                    <div class="card-icon">💰</div>
-                    <div>
-                        <div class="card-title">Giá trị nhập</div>
-                        <div class="card-value">${formatMoney(inventorySummary.totalCostValue)}</div>
-                    </div>
-                </div>
-                <div class="summary-card">
-                    <div class="card-icon">🏷️</div>
-                    <div>
-                        <div class="card-title">Giá trị bán</div>
-                        <div class="card-value">${formatMoney(inventorySummary.totalSellingValue)}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Ẩn tất cả các tab content
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.add('hidden');
-        });
-        
-        // Reset active tab button
-        document.querySelectorAll('.horizontal-tabs .tab-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        
-        // Mặc định hiển thị tab Tồn kho
-        const firstTab = document.querySelector('.horizontal-tabs .tab-button');
-        if (firstTab) {
-            firstTab.classList.add('active');
-            showTab('inventoryTab', firstTab, businessId);
-        }
-    } catch (e) {
-        console.error('Lỗi showBusinessDetails:', e);
-    }
-}
-function showPriceList(businessId) {
-    const businessDetails = document.getElementById('businessDetails');
-    if (!businessDetails) {
-        console.error('Không tìm thấy #businessDetails trong DOM');
-        return;
-    }
-    try {
         const inv = inventory.filter(i => i.businessId === businessId);
         inv.sort((a, b) => a.name.localeCompare(b.name, 'vi-VN'));
 
-        const priceListTable = `
+        priceListTab.innerHTML = `
             <div class="section">
                 <h4>Bảng giá bán (${inv.length} sản phẩm)</h4>
                 <table class="compact-table">
                     <thead>
                         <tr>
-                            <th>Mã sản phẩm</th><th>Tên sản phẩm</th><th>Giá sản phẩm</th><th>Đơn vị tính</th><th>Mô tả</th>
+                            <th>STT</th><th>Tên hàng hóa</th><th>Đơn vị</th><th>Giá bán</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${inv.map(i => `
-                            <tr>
-                                <td>${generateUUID().substring(0, 8)}</td>
-                                <td>${i.name}</td>
-                                <td>${formatMoney(calculateSellingPrice(normalizeNumber(i.price)))}</td> <!-- Cập nhật logic -->
-                                <td>${i.unit}</td>
-                                <td>${i.name}</td>
-                            </tr>
-                        `).join('')}
+                        ${inv.map((i, index) => {
+            console.log('Hiển thị giá bán:', { id: i.id, name: i.name, giaBan: i.giaBan });
+            return `
+                                <tr>
+                                    <td>${index + 1}</td>
+                                    <td>${i.name}</td>
+                                    <td>${i.unit}</td>
+                                    <td>${i.giaBan || formatMoney(calculateSellingPrice(normalizeNumber(i.price)))}</td>
+                                </tr>
+                            `;
+        }).join('')}
                     </tbody>
                 </table>
             </div>
         `;
-
-        const priceListTab = document.getElementById('priceListTab');
-        if (priceListTab) {
-            priceListTab.innerHTML = priceListTable;
-        }
     } catch (e) {
         console.error('Lỗi showPriceList:', e);
     }
@@ -2934,16 +3281,16 @@ function showExportHistory(businessId) {
                     </thead>
                     <tbody>
                         ${exports.map(exp => {
-                            const customerName = exp.customerName || randomCustomerName();
-                            const customerAddress = exp.customerAddress || randomAddressNinhThuan();
-                            const totalQuantity = exp.items.reduce((sum, item) => sum + normalizeNumber(item.qty), 0);
-                            const totalCost = exp.items.reduce((sum, item) => 
-                                sum + normalizeNumber(item.price) * normalizeNumber(item.qty), 0);
-                            
-                            // Tính tồn kho sau xuất
-                            const remaining = calculateRemainingStockAfterExport(businessId, exp);
-                            
-                            return `
+            const customerName = exp.customerName || randomCustomerName();
+            const customerAddress = exp.customerAddress || randomAddressNinhThuan();
+            const totalQuantity = exp.items.reduce((sum, item) => sum + normalizeNumber(item.qty), 0);
+            const totalCost = exp.items.reduce((sum, item) =>
+                sum + normalizeNumber(item.price) * normalizeNumber(item.qty), 0);
+
+            // Tính tồn kho sau xuất
+            const remaining = calculateRemainingStockAfterExport(businessId, exp);
+
+            return `
                                 <tr>
                                     <td>${new Date(exp.exportDate).toLocaleDateString('vi-VN')}</td>
                                     <td>${exp.exportCode}</td>
@@ -2958,7 +3305,7 @@ function showExportHistory(businessId) {
                                     </td>
                                 </tr>
                             `;
-                        }).join('')}
+        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -2973,16 +3320,16 @@ function calculateRemainingStockAfterExport(businessId, exportRecord) {
     const currentInventory = inventory.filter(i => i.businessId === businessId);
     let totalCost = 0;
     let totalSelling = 0;
-    
+
     currentInventory.forEach(item => {
         const qty = normalizeNumber(item.qty);
         const cost = normalizeNumber(item.price);
         const selling = calculateSellingPrice(cost);
-        
+
         totalCost += qty * cost;
         totalSelling += qty * selling;
     });
-    
+
     return { totalCost, totalSelling };
 }
 function showExportDetails(exportId) {
@@ -3051,7 +3398,7 @@ function showTab(tabId, button, businessId) {
         const tab = document.getElementById(tabId);
         if (tab) {
             tab.classList.remove('hidden');
-            
+
             switch (tabId) {
                 case 'inventoryTab':
                     showBusinessInventory(businessId);
@@ -3135,7 +3482,7 @@ function showExportTab(businessId) {
                 <div id="exportTotal">Tổng tiền: 0 VND</div>
             </div>
         `;
-        
+
         // Tự động tạo danh sách ngẫu nhiên ban đầu
         generateRandomExportItems(businessId);
     } catch (e) {
@@ -3150,7 +3497,7 @@ function generateRandomExportItems(businessId) {
             console.error('Không tìm thấy #exportItemsBodyContent trong DOM');
             return;
         }
-        
+
         const inv = inventory.filter(i => i.businessId === businessId && normalizeNumber(i.qty) > 0 && normalizeNumber(i.price) > 0);
         if (inv.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8">Không có sản phẩm để xuất.</td></tr>';
@@ -3169,34 +3516,34 @@ function generateRandomExportItems(businessId) {
 
         // Sắp xếp ngẫu nhiên danh sách hàng hóa
         const shuffledItems = [...inv].sort(() => Math.random() - 0.5);
-        
+
         let totalAmount = 0;
         const itemsToExport = [];
         const tolerance = targetAmount * 0.1; // Cho phép sai số 10%
-        
+
         for (const item of shuffledItems) {
             if (totalAmount >= targetAmount + tolerance) break;
-            
+
             const maxQty = normalizeNumber(item.qty);
             const sellingPrice = calculateSellingPrice(normalizeNumber(item.price));
             const maxPossibleQty = Math.min(
-                maxQty, 
+                maxQty,
                 Math.floor((targetAmount + tolerance - totalAmount) / sellingPrice)
             );
-            
+
             if (maxPossibleQty <= 0) continue;
-            
+
             // Chọn số lượng ngẫu nhiên từ 1 đến maxPossibleQty
             const qty = Math.max(1, Math.floor(Math.random() * maxPossibleQty) + 1);
             const itemTotal = qty * sellingPrice;
-            
+
             itemsToExport.push({
                 ...item,
                 qty,
                 sellingPrice,
                 itemTotal
             });
-            
+
             totalAmount += itemTotal;
         }
 
@@ -3209,7 +3556,7 @@ function generateRandomExportItems(businessId) {
                 normalizeNumber(lastItem.qty) - lastItem.qty, // Số lượng còn lại trong kho
                 Math.ceil(neededAmount / lastItem.sellingPrice)
             );
-            
+
             if (additionalQty > 0) {
                 lastItem.qty += additionalQty;
                 lastItem.itemTotal = lastItem.qty * lastItem.sellingPrice;
@@ -3234,7 +3581,7 @@ function generateRandomExportItems(businessId) {
                 </tr>
             `).join('');
         }
-        
+
         updateExportTotal(businessId);
     } catch (e) {
         console.error('Lỗi generateRandomExportItems:', e);
@@ -3404,7 +3751,7 @@ function addUtilityButtons() {
     const controls = document.createElement('div');
     controls.id = 'utilityControls';
     controls.className = 'utility-controls';
-    
+
     controls.innerHTML = `
         <div class="utility-section">
             <div class="utility-buttons-container">
@@ -3414,6 +3761,7 @@ function addUtilityButtons() {
                 <button onclick="restorePreviousSession()" class="restore-btn" title="Khôi phục phiên trước">
                     ↻ Khôi phục
                 </button>
+<button class="tab-button" onclick="showUpdateSellingPricePopup()">🔄 Cập nhật giá bán</button>
                 <button class="tab-button" onclick="showActivityLogPopup()">📝 Lịch sử</button>
                 <button onclick="clearAllData()">🗑️ Deletel All</button>
                 <button class="tab-button active" onclick="showTab('inventoryTab', this, selectedBusinessId)">Tồn kho</button>
@@ -3427,19 +3775,19 @@ function addUtilityButtons() {
             </div>
         </div>
     `;
-    
+
     document.body.prepend(controls);
-    
+
     // Phím tắt và cập nhật tự động
     document.addEventListener('keydown', (e) => e.ctrlKey && e.key === 'z' && (e.preventDefault(), undoLastAction()));
-    
+
     const updateCounter = () => {
         const btn = document.querySelector('.undo-btn');
         if (btn) btn.textContent = `↩ Undo (${undoStack.length}/${MAX_UNDO_STEPS})`;
     };
-    
+
     const originalPush = Array.prototype.push;
-    Array.prototype.push = function() {
+    Array.prototype.push = function () {
         const result = originalPush.apply(this, arguments);
         updateCounter();
         return result;
@@ -3449,7 +3797,7 @@ function addUtilityButtons() {
 
 // Khởi tạo khi tải trang
 document.addEventListener('DOMContentLoaded', () => {
- addUtilityButtons();
+    addUtilityButtons();
     updateBusinessList();
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
@@ -3463,6 +3811,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ` : '<p>Không tìm thấy kết quả.</p>';
             }
         });
+
     }
 });
 // Thêm vào phần HÀM TIỆN ÍCH CHUNG
@@ -3505,31 +3854,31 @@ function exportToGist(token) {
             },
             body: JSON.stringify(gistData)
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(result => {
-            // Ghi log
-            logActivity('export_json_gist', {
-                exportedRecords: {
-                    businesses: data.businesses.length,
-                    invoices: data.invoices.length,
-                    inventory: data.inventory.length,
-                    exportedInvoices: data.exportedInvoices.length
-                },
-                gistId: gistId,
-                gistUrl: result.html_url
-            });
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(result => {
+                // Ghi log
+                logActivity('export_json_gist', {
+                    exportedRecords: {
+                        businesses: data.businesses.length,
+                        invoices: data.invoices.length,
+                        inventory: data.inventory.length,
+                        exportedInvoices: data.exportedInvoices.length
+                    },
+                    gistId: gistId,
+                    gistUrl: result.html_url
+                });
 
-            alert('Đã xuất dữ liệu lên GitHub Gist thành công! URL: ' + result.html_url);
-        })
-        .catch(error => {
-            console.error('Lỗi exportToGist:', error);
-            alert('Lỗi khi xuất dữ liệu lên Gist: ' + error.message);
-        });
+                alert('Đã xuất dữ liệu lên GitHub Gist thành công! URL: ' + result.html_url);
+            })
+            .catch(error => {
+                console.error('Lỗi exportToGist:', error);
+                alert('Lỗi khi xuất dữ liệu lên Gist: ' + error.message);
+            });
     } catch (e) {
         console.error('Lỗi exportToGist:', e);
         alert('Lỗi khi xuất dữ liệu lên Gist: ' + e.message);
@@ -3667,80 +4016,80 @@ function importFromGist() {
                 'Accept': 'application/vnd.github+json'
             }
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            const fileContent = data.files && data.files['data.json'] && data.files['data.json'].content;
-            if (!fileContent) {
-                throw new Error('Gist không chứa file data.json hoặc file rỗng!');
-            }
-            let parsedData;
-            try {
-                parsedData = JSON.parse(fileContent);
-            } catch (e) {
-                throw new Error('Nội dung JSON không hợp lệ: ' + e.message);
-            }
-            if (!Array.isArray(parsedData.businesses) ||
-                !Array.isArray(parsedData.invoices) ||
-                !Array.isArray(parsedData.inventory) ||
-                !Array.isArray(parsedData.exportedInvoices)) {
-                throw new Error('Dữ liệu JSON không đúng định dạng! Các trường businesses, invoices, inventory, exportedInvoices phải là mảng.');
-            }
-            const hasValidBusinesses = parsedData.businesses.every(b => b.id && b.name && b.taxCode && b.address);
-            const hasValidInvoices = parsedData.invoices.every(i => i.id && i.businessId && i.mccqt && i.number && i.series && i.date && i.seller && i.items);
-            const hasValidInventory = parsedData.inventory.every(i => i.id && i.businessId && i.name && i.unit && i.qty && i.price);
-            const hasValidExportedInvoices = parsedData.exportedInvoices.every(e => e.id && e.businessId && e.exportCode && e.exportDate && e.items);
-            if (!hasValidBusinesses || !hasValidInvoices || !hasValidInventory || !hasValidExportedInvoices) {
-                throw new Error('Dữ liệu trong JSON không hợp lệ! Vui lòng kiểm tra cấu trúc dữ liệu.');
-            }
-            const businessIds = new Set(parsedData.businesses.map(b => b.id));
-            const invalidInvoices = parsedData.invoices.some(i => !businessIds.has(i.businessId));
-            const invalidInventory = parsedData.inventory.some(i => !businessIds.has(i.businessId));
-            const invalidExportedInvoices = parsedData.exportedInvoices.some(e => !businessIds.has(e.businessId));
-            if (invalidInvoices || invalidInventory || invalidExportedInvoices) {
-                throw new Error('JSON chứa businessId không hợp lệ! Vui lòng đảm bảo tất cả businessId đều tồn tại trong danh sách businesses.');
-            }
-            saveCurrentState();
-            businesses = [...parsedData.businesses];
-            invoices = [...parsedData.invoices];
-            inventory = [...parsedData.inventory];
-            exportedInvoices = [...parsedData.exportedInvoices];
-            lastActiveBusinessId = parsedData.lastActiveBusinessId || parsedData.businesses[0]?.id || null;
-            localStorage.setItem('businesses', JSON.stringify(businesses));
-            localStorage.setItem('invoices', JSON.stringify(invoices));
-            localStorage.setItem('inventory', JSON.stringify(inventory));
-            localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
-            localStorage.setItem('lastActiveBusinessId', lastActiveBusinessId);
-            updateBusinessList(lastActiveBusinessId);
-            if (lastActiveBusinessId) {
-                showBusinessDetails(lastActiveBusinessId);
-                showPriceList(lastActiveBusinessId);
-                showExportHistory(lastActiveBusinessId);
-            } else {
-                document.getElementById('businessDetails').innerHTML = '';
-                document.getElementById('priceList').innerHTML = '';
-                document.getElementById('exportHistory').innerHTML = '';
-            }
-            logActivity('import_json_gist', {
-                importedRecords: {
-                    businesses: parsedData.businesses.length,
-                    invoices: parsedData.invoices.length,
-                    inventory: parsedData.inventory.length,
-                    exportedInvoices: parsedData.exportedInvoices.length
-                },
-                gistId: gistId,
-                gistUrl: data.html_url
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const fileContent = data.files && data.files['data.json'] && data.files['data.json'].content;
+                if (!fileContent) {
+                    throw new Error('Gist không chứa file data.json hoặc file rỗng!');
+                }
+                let parsedData;
+                try {
+                    parsedData = JSON.parse(fileContent);
+                } catch (e) {
+                    throw new Error('Nội dung JSON không hợp lệ: ' + e.message);
+                }
+                if (!Array.isArray(parsedData.businesses) ||
+                    !Array.isArray(parsedData.invoices) ||
+                    !Array.isArray(parsedData.inventory) ||
+                    !Array.isArray(parsedData.exportedInvoices)) {
+                    throw new Error('Dữ liệu JSON không đúng định dạng! Các trường businesses, invoices, inventory, exportedInvoices phải là mảng.');
+                }
+                const hasValidBusinesses = parsedData.businesses.every(b => b.id && b.name && b.taxCode && b.address);
+                const hasValidInvoices = parsedData.invoices.every(i => i.id && i.businessId && i.mccqt && i.number && i.series && i.date && i.seller && i.items);
+                const hasValidInventory = parsedData.inventory.every(i => i.id && i.businessId && i.name && i.unit && i.qty && i.price);
+                const hasValidExportedInvoices = parsedData.exportedInvoices.every(e => e.id && e.businessId && e.exportCode && e.exportDate && e.items);
+                if (!hasValidBusinesses || !hasValidInvoices || !hasValidInventory || !hasValidExportedInvoices) {
+                    throw new Error('Dữ liệu trong JSON không hợp lệ! Vui lòng kiểm tra cấu trúc dữ liệu.');
+                }
+                const businessIds = new Set(parsedData.businesses.map(b => b.id));
+                const invalidInvoices = parsedData.invoices.some(i => !businessIds.has(i.businessId));
+                const invalidInventory = parsedData.inventory.some(i => !businessIds.has(i.businessId));
+                const invalidExportedInvoices = parsedData.exportedInvoices.some(e => !businessIds.has(e.businessId));
+                if (invalidInvoices || invalidInventory || invalidExportedInvoices) {
+                    throw new Error('JSON chứa businessId không hợp lệ! Vui lòng đảm bảo tất cả businessId đều tồn tại trong danh sách businesses.');
+                }
+                saveCurrentState();
+                businesses = [...parsedData.businesses];
+                invoices = [...parsedData.invoices];
+                inventory = [...parsedData.inventory];
+                exportedInvoices = [...parsedData.exportedInvoices];
+                lastActiveBusinessId = parsedData.lastActiveBusinessId || parsedData.businesses[0]?.id || null;
+                localStorage.setItem('businesses', JSON.stringify(businesses));
+                localStorage.setItem('invoices', JSON.stringify(invoices));
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+                localStorage.setItem('exportedInvoices', JSON.stringify(exportedInvoices));
+                localStorage.setItem('lastActiveBusinessId', lastActiveBusinessId);
+                updateBusinessList(lastActiveBusinessId);
+                if (lastActiveBusinessId) {
+                    showBusinessDetails(lastActiveBusinessId);
+                    showPriceList(lastActiveBusinessId);
+                    showExportHistory(lastActiveBusinessId);
+                } else {
+                    document.getElementById('businessDetails').innerHTML = '';
+                    document.getElementById('priceList').innerHTML = '';
+                    document.getElementById('exportHistory').innerHTML = '';
+                }
+                logActivity('import_json_gist', {
+                    importedRecords: {
+                        businesses: parsedData.businesses.length,
+                        invoices: parsedData.invoices.length,
+                        inventory: parsedData.inventory.length,
+                        exportedInvoices: parsedData.exportedInvoices.length
+                    },
+                    gistId: gistId,
+                    gistUrl: data.html_url
+                });
+                alert('Đã nhập dữ liệu từ GitHub Gist thành công! URL: ' + data.html_url);
+            })
+            .catch(error => {
+                console.error('Lỗi importFromGist:', error);
+                alert('Lỗi khi nhập dữ liệu từ Gist: ' + error.message);
             });
-            alert('Đã nhập dữ liệu từ GitHub Gist thành công! URL: ' + data.html_url);
-        })
-        .catch(error => {
-            console.error('Lỗi importFromGist:', error);
-            alert('Lỗi khi nhập dữ liệu từ Gist: ' + error.message);
-        });
     } catch (e) {
         console.error('Lỗi importFromGist:', e);
         alert('Lỗi khi nhập dữ liệu từ Gist: ' + e.message);
@@ -3996,7 +4345,7 @@ function saveExport(businessId) {
         }
 
         const grandTotal = items.reduce((sum, item) => sum + normalizeNumber(item.total), 0);
-logActivity('export_create', {
+        logActivity('export_create', {
             businessId: businessId,
             itemCount: items.length,
             totalAmount: grandTotal,
@@ -4186,71 +4535,79 @@ function addManualInventoryItem() {
     }
 }
 
-function saveManualInventory() {
+function calculateSellingPrice(cost) {
+    const percentage = parseFloat(localStorage.getItem('sellingPricePercentage')) || 0.10;
+    const fixedAmount = parseFloat(localStorage.getItem('sellingPriceFixedAmount')) || 3000;
+    console.log('calculateSellingPrice:', { cost, percentage, fixedAmount });
+    const price = cost * (1 + percentage) + fixedAmount;
+    return Math.ceil(price / 500) * 500;
+}
+
+function saveManualInventory(businessId) {
     try {
-        const businessId = document.querySelector('.sidebar li.active')?.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
-        if (!businessId) {
-            alert('Vui lòng chọn Hộ Kinh Doanh trước khi lưu tồn kho!');
+        const form = document.getElementById('manualInventoryForm');
+        const name = form.querySelector('#inventoryName').value.trim();
+        const unit = form.querySelector('#inventoryUnit').value.trim();
+        const qty = form.querySelector('#inventoryQty').value.trim();
+        const price = form.querySelector('#inventoryPrice').value.trim();
+        const vat = form.querySelector('#inventoryVat').value.trim() || '10%';
+
+        if (!name || !unit || !qty || !price) {
+            alert('Vui lòng điền đầy đủ thông tin!');
             return;
         }
 
-        const items = [];
-        const tbody = document.getElementById('manualInventoryItemsBody');
-        if (!tbody) {
-            console.error('Không tìm thấy #manualInventoryItemsBody trong DOM');
+        const basePrice = normalizeNumber(price);
+        const qtyNum = normalizeNumber(qty);
+        const vatRate = parseFloat(vat.replace('%', '')) / 100;
+
+        if (isNaN(basePrice) || isNaN(qtyNum) || qtyNum <= 0) {
+            alert('Số lượng và giá phải là số hợp lệ!');
             return;
         }
 
-        Array.from(tbody.querySelectorAll('tr')).forEach(row => {
-            const cells = row.querySelectorAll('td[contenteditable="true"]');
-            if (cells.length === 5) {
-                const name = cells[0].innerText.trim() || 'Hàng hóa mới';
-                const unit = cells[1].innerText.trim() || 'Cái';
-                const qty = normalizeNumber(cells[2].innerText) || 0;
-                const price = normalizeNumber(cells[3].innerText) || 0;
-                const vat = cells[4].innerText.trim().replace('%', '') || '10';
-                const total = qty * price;
-const giaBan = Math.ceil((price + price * 0.10 + 3000) / 500) * 500;
+        const taxAmount = basePrice * vatRate * qtyNum;
+        const newItem = {
+            id: generateUUID(),
+            businessId,
+            stt: (inventory.length + 1).toString(),
+            type: 'Hàng hóa, dịch vụ',
+            name,
+            unit,
+            qty: qtyNum.toString(),
+            price,
+            discount: '0',
+            vat,
+            total: formatMoney(qtyNum * basePrice),
+            taxAmount: formatMoney(taxAmount),
+            totalAfterTax: formatMoney((basePrice * qtyNum) + taxAmount),
+            giaBan: formatMoney(calculateSellingPrice(basePrice)),
+            lastUpdated: new Date().toISOString()
+        };
 
-                if (name && qty > 0 && price >= 0) {
-                    items.push({
-                        id: generateUUID(),
-                        businessId,
-                        stt: (items.length + 1).toString(),
-                        type: 'Hàng hóa, dịch vụ',
-                        name,
-                        unit,
-                        qty: qty.toString(),
-                        price: price.toString(),
-                        discount: '0',
-                        vat: `${vat}%`,
-                        total: formatMoney(total),
-                        giaBan: giaBan,
-                        lastUpdated: new Date().toISOString()
-                    });
-                }
-            }
-        });
+        console.log('saveManualInventory:', { businessId, name, price, giaBan: newItem.giaBan });
 
-        if (items.length === 0) {
-            alert('Vui lòng thêm ít nhất một sản phẩm vào tồn kho!');
-            return;
-        }
-
-        inventory = inventory.filter(i => i.businessId !== businessId);
-        inventory.push(...items);
+        saveCurrentState();
+        inventory.push(newItem);
         localStorage.setItem('inventory', JSON.stringify(inventory));
 
-        hideManualInventoryForm();
-        showBusinessDetails(businessId);
-        showPriceList(businessId);
-        showExportHistory(businessId);
-        alert('Đã lưu tồn kho thủ công thành công!');
+        logActivity('manual_inventory_add', {
+            businessId,
+            name,
+            qty: qtyNum,
+            price: basePrice,
+            giaBan: newItem.giaBan
+        });
+
+        showBusinessInventory(businessId);
+        form.reset();
+        alert('Đã thêm mặt hàng vào tồn kho!');
     } catch (e) {
         console.error('Lỗi saveManualInventory:', e);
-        alert('Lỗi khi lưu tồn kho thủ công: ' + e.message);
+        alert('Lỗi khi thêm mặt hàng: ' + e.message);
     }
 }
+
 
 // 📊 Xuất Excel Tồn kho
 function exportInventoryToExcel(businessId) {
@@ -4412,41 +4769,36 @@ function updateExportTotal(businessId) {
 }
 
 function getBusinessInventorySummary(businessId) {
-    const inv = inventory.filter(i => i.businessId === businessId);
-    let totalItems = 0;
-    let totalQuantity = 0;
-    let totalCostValue = 0; // Giá trị nhập đã bao gồm thuế
-    let totalSellingValue = 0;
+    try {
+        const inv = inventory.filter(i => i.businessId === businessId);
+        let totalItems = inv.length;
+        let totalQuantity = 0;
+        let totalCostValue = 0;
+        let totalSellingValue = 0;
 
-    let totalBeforeTax = 0;
-    let totalTax = 0;
-    let totalDiscount = 0;
+        inv.forEach(i => {
+            const qty = normalizeNumber(i.qty);
+            const price = normalizeNumber(i.price);
+            const giaBan = normalizeNumber(i.giaBan || calculateSellingPrice(price));
+            const vatRate = parseFloat((i.vat || '10%').replace('%', '')) / 100;
+            const taxAmount = price * vatRate * qty;
 
-    inv.forEach(item => {
-        totalItems++;
-        const qty = normalizeNumber(item.qty);
-        const price = normalizeNumber(item.price);
-        const discount = normalizeNumber(item.discount || '0');
-        const vatRate = parseFloat((item.vat || '10').replace('%', '')) / 100;
+            totalQuantity += qty;
+            totalCostValue += (price * qty) + taxAmount;
+            totalSellingValue += giaBan * qty;
+            console.log('Tính tổng hợp:', { id: i.id, name: i.name, qty, price, giaBan });
+        });
 
-        const itemTotalBeforeTax = qty * price; // Không trừ chiết khấu
-        const itemTax = itemTotalBeforeTax * vatRate; // Thuế trên giá trị chưa trừ chiết khấu
-
-        totalBeforeTax += itemTotalBeforeTax;
-        totalTax += itemTax;
-        totalDiscount += discount;
-        totalQuantity += qty;
-        totalSellingValue += qty * calculateSellingPrice(price);
-    });
-
-    totalCostValue = totalBeforeTax + totalTax - totalDiscount; // Trừ chiết khấu một lần
-
-    return {
-        totalItems,
-        totalQuantity,
-        totalCostValue,
-        totalSellingValue
-    };
+        return {
+            totalItems,
+            totalQuantity,
+            totalCostValue,
+            totalSellingValue
+        };
+    } catch (e) {
+        console.error('Lỗi getBusinessInventorySummary:', e);
+        return { totalItems: 0, totalQuantity: 0, totalCostValue: 0, totalSellingValue: 0 };
+    }
 }
 
 function getRecentImportHistory(businessId, limit = 3) {
@@ -4492,7 +4844,7 @@ function getRecentImportHistory(businessId, limit = 3) {
 
 function renderImportHistory(imports) {
     if (imports.length === 0) return '<p>Chưa có lịch sử nhập hàng</p>';
-    
+
     return `
         <table class="history-table">
             <thead>
@@ -4509,12 +4861,12 @@ function renderImportHistory(imports) {
             </thead>
             <tbody>
                 ${imports.map(imp => {
-                    const statusColor = checkInvoice(imp.invoice);
-                    const remainingStock = calculateRemainingStock(imp.invoice);
-                    const remainingValue = remainingStock.totalCost;
-                    const remainingSellingValue = remainingStock.totalSelling;
-                    
-                    return `
+        const statusColor = checkInvoice(imp.invoice);
+        const remainingStock = calculateRemainingStock(imp.invoice);
+        const remainingValue = remainingStock.totalCost;
+        const remainingSellingValue = remainingStock.totalSelling;
+
+        return `
                         <tr style="background-color: ${statusColor}">
                             <td>${new Date(imp.date).toLocaleDateString('vi-VN')}</td>
                             <td>${imp.invoiceNumber}</td>
@@ -4528,7 +4880,7 @@ function renderImportHistory(imports) {
                             </td>
                         </tr>
                     `;
-                }).join('')}
+    }).join('')}
             </tbody>
         </table>
     `;
@@ -4536,7 +4888,7 @@ function renderImportHistory(imports) {
 
 function renderImportHistory(imports) {
     if (imports.length === 0) return '<p>Chưa có lịch sử nhập hàng</p>';
-    
+
     return `
         <table class="history-table">
             <thead>
@@ -4553,12 +4905,12 @@ function renderImportHistory(imports) {
             </thead>
             <tbody>
                 ${imports.map(imp => {
-                    const statusColor = checkInvoice(imp.invoice);
-                    const remainingStock = calculateRemainingStock(imp.invoice);
-                    const remainingValue = remainingStock.totalCost;
-                    const remainingSellingValue = remainingStock.totalSelling;
-                    
-                    return `
+        const statusColor = checkInvoice(imp.invoice);
+        const remainingStock = calculateRemainingStock(imp.invoice);
+        const remainingValue = remainingStock.totalCost;
+        const remainingSellingValue = remainingStock.totalSelling;
+
+        return `
                         <tr style="background-color: ${statusColor}">
                             <td>${new Date(imp.date).toLocaleDateString('vi-VN')}</td>
                             <td>${imp.invoiceNumber}</td>
@@ -4572,7 +4924,7 @@ function renderImportHistory(imports) {
                             </td>
                         </tr>
                     `;
-                }).join('')}
+    }).join('')}
             </tbody>
         </table>
     `;
@@ -4583,16 +4935,16 @@ function calculateRemainingStock(invoice) {
     const currentInventory = inventory.filter(i => i.businessId === invoice.businessId);
     let totalCost = 0;
     let totalSelling = 0;
-    
+
     currentInventory.forEach(item => {
         const qty = normalizeNumber(item.qty);
         const cost = normalizeNumber(item.price);
         const selling = calculateSellingPrice(cost);
-        
+
         totalCost += qty * cost;
         totalSelling += qty * selling;
     });
-    
+
     return { totalCost, totalSelling };
 }
 
@@ -4666,12 +5018,12 @@ function getBusinessInventorySummary(businessId) {
         const price = normalizeNumber(item.price);
         const discount = normalizeNumber(item.discount || '0');
         const vatRate = parseFloat((item.vat || '10%').replace('%', '')) / 100;
-        
+
         // Tính toán giống như trong hóa đơn
         const itemTotalBeforeTax = qty * price - discount;
         const itemTax = itemTotalBeforeTax * vatRate;
         const itemTotal = itemTotalBeforeTax + itemTax;
-        
+
         totalQuantity += qty;
         totalCostValue += itemTotal;
         totalSellingValue += qty * calculateSellingPrice(price);
@@ -4725,7 +5077,7 @@ function getRecentImportHistory(businessId, limit = 3) {
 }
 function renderImportHistory(imports) {
     if (imports.length === 0) return '<p>Chưa có lịch sử nhập hàng</p>';
-    
+
     return `
         <table class="compact-table">
             <thead>
@@ -4754,7 +5106,7 @@ function renderImportHistory(imports) {
 
 function renderExportHistory(exports) {
     if (exports.length === 0) return '<p>Chưa có lịch sử xuất hàng</p>';
-    
+
     return `
         <table class="compact-table">
             <thead>
@@ -5215,4 +5567,640 @@ document.querySelectorAll('.tab-button').forEach(button => {
     document.getElementById(this.dataset.target).classList.remove('hidden');
   });
 });
+////////////////////////////////////////////////////////////// XEM HÓA ĐƠN - POPUP HÓA ĐƠN
+// In the section for managing invoices (assumed to be part of showBusinessDetails)
+// Modify the invoice table rendering to replace the export Excel button with a delete invoice button
+function showBusinessDetails(businessId) {
+    try {
+        // Cập nhật HKD đang làm việc
+        lastActiveBusinessId = businessId;
+
+        const businessDetails = document.getElementById('businessDetails');
+        if (!businessDetails) return;
+
+        const business = businesses.find(b => b.id === businessId);
+        if (!business) {
+            businessDetails.innerHTML = '<p>Không tìm thấy Hộ Kinh Doanh.</p>';
+            return;
+        }
+
+        selectedBusinessId = businessId;
+        updateBusinessList(businessId);
+
+        const inventorySummary = getBusinessInventorySummary(businessId);
+
+        businessDetails.innerHTML = `
+            <div class="business-header">
+                <h3>${business.name}</h3>
+                <div class="business-info">
+                    <span><strong>MST:</strong> ${business.taxCode}</span>
+                    <span><strong>Địa chỉ:</strong> ${business.address}</span>
+                </div>
+                <!-- Thêm nút tạo hóa đơn thủ công vào đây -->
+                <div class="business-actions">
+                    
+                <button class="tab-button active" onclick="showTab('inventoryTab', this, selectedBusinessId)">Tồn kho</button>
+                <button class="tab-button" onclick="showTab('invoicesTab', this, selectedBusinessId)">Hóa đơn</button>
+                <button class="tab-button" onclick="showTab('priceListTab', this, selectedBusinessId)">Giá bán</button>
+                <button class="tab-button" onclick="showTab('exportHistoryTab', this, selectedBusinessId)">Lịch sử xuất hàng</button>
+                <button class="tab-button" onclick="showTab('exportTab', this, selectedBusinessId)">Xuất hàng tự động</button>
+<button onclick="showManualInvoicePopup('${businessId}')" class="btn-manual-invoice">
+                        <span class="icon">📝</span> Xuất hàng thủ công
+                    </button>
+                <button class="tab-button" onclick="showExportJsonPopup()">📤 Lưu GIST</button>
+                <button class="tab-button" onclick="importFromGist()">📥 Nhập GIST</button>
+                <input type="file" id="jsonInput" accept=".json" style="display: none;" onchange="importFromJSON(event)">
+
+                </div>
+            </div>
+            
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="card-icon">📦</div>
+                    <div>
+                        <div class="card-title">Tồn kho</div>
+                        <div class="card-value">${inventorySummary.totalItems} mặt hàng</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">🧮</div>
+                    <div>
+                        <div class="card-title">Tổng số lượng</div>
+                        <div class="card-value">${formatMoney(inventorySummary.totalQuantity)}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">💰</div>
+                    <div>
+                        <div class="card-title">Giá trị nhập</div>
+                        <div class="card-value">${formatMoney(inventorySummary.totalCostValue)}</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <div class="card-icon">🏷️</div>
+                    <div>
+                        <div class="card-title">Giá trị bán</div>
+                        <div class="card-value">${formatMoney(inventorySummary.totalSellingValue)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Ẩn tất cả các tab content
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.add('hidden');
+        });
+
+        // Reset active tab button
+        document.querySelectorAll('.horizontal-tabs .tab-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        // Mặc định hiển thị tab Tồn kho
+        const firstTab = document.querySelector('.horizontal-tabs .tab-button');
+        if (firstTab) {
+            firstTab.classList.add('active');
+            showTab('inventoryTab', firstTab, businessId);
+        }
+    } catch (e) {
+        console.error('Lỗi showBusinessDetails:', e);
+    }
+}
+
+// New function to handle invoice deletion
+function deleteInvoice(invoiceId, businessId) {
+    try {
+        if (confirm('Bạn có chắc muốn xóa hóa đơn này?')) {
+            saveCurrentState();
+            const invoice = invoices.find(i => i.id === invoiceId);
+            if (!invoice) {
+                throw new Error('Hóa đơn không tồn tại');
+            }
+
+            // Reverse inventory changes based on invoice direction
+            invoice.items.forEach(item => {
+                if (item.type === 'Hàng hóa, dịch vụ') {
+                    const qtyChange = normalizeNumber(item.qty) * (invoice.direction === 'input' ? -1 : 1);
+                    const invItem = inventory.find(i => i.businessId === businessId && i.name === item.name);
+                    if (invItem) {
+                        invItem.qty = (normalizeNumber(invItem.qty) + qtyChange).toString();
+                        if (normalizeNumber(invItem.qty) <= 0) {
+                            inventory = inventory.filter(i => i.id !== invItem.id);
+                        }
+                    }
+                }
+            });
+
+            // Remove the invoice
+            invoices = invoices.filter(i => i.id !== invoiceId);
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            localStorage.setItem('inventory', JSON.stringify(inventory));
+
+            // Log the activity
+            logActivity('invoice_delete', {
+                invoiceId,
+                businessId,
+                invoiceNumber: invoice.series + '-' + invoice.number
+            });
+
+            // Refresh UI
+            showBusinessDetails(businessId);
+            alert('Đã xóa hóa đơn thành công!');
+        }
+    } catch (e) {
+        console.error('Lỗi deleteInvoice:', e);
+        alert('Lỗi khi xóa hóa đơn: ' + e.message);
+    }
+}
+
+// Modified showInvoiceDetails function to include CSS and reposition navigation buttons
+function showInvoiceDetails(invoiceId) {
+    try {
+        const invoice = invoices.find(i => i.id === invoiceId);
+        if (!invoice) {
+            console.error(`Không tìm thấy hóa đơn với ID ${invoiceId}`);
+            alert('Hóa đơn không tồn tại!');
+            return;
+        }
+
+        const businessInvoices = invoices.filter(i => i.businessId === invoice.businessId)
+            .sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+        const currentIndex = businessInvoices.findIndex(i => i.id === invoiceId);
+        const prevInvoiceId = currentIndex > 0 ? businessInvoices[currentIndex - 1].id : null;
+        const nextInvoiceId = currentIndex < businessInvoices.length - 1 ? businessInvoices[currentIndex + 1].id : null;
+
+        let totalBeforeTax = 0;
+        let totalTax = 0;
+        let totalDiscount = 0;
+        let totalPayment = 0;
+        let totalSelling = 0;
+
+        invoice.items.forEach(item => {
+            const qty = normalizeNumber(item.qty);
+            const price = normalizeNumber(item.price);
+            const discount = normalizeNumber(item.discount || '0');
+            const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
+
+            const itemTotalBeforeTax = qty * price - discount;
+            const itemTax = itemTotalBeforeTax * vatRate;
+            const itemTotal = itemTotalBeforeTax + itemTax;
+
+            totalBeforeTax += itemTotalBeforeTax;
+            totalTax += itemTax;
+            totalDiscount += discount;
+            totalPayment += itemTotal;
+            totalSelling += qty * calculateSellingPrice(price);
+        });
+
+        const invoiceTable = `
+            <style>
+                .invoice-details-table {
+                    flex: 1;
+                    padding: 20px;
+                    background: #fff;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                }
+                .invoice-details-table h4 {
+                    margin: 0 0 15px;
+                    font-size: 18px;
+                    color: #1a1a1a;
+                }
+                .compact-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 14px;
+                }
+                .compact-table th, .compact-table td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    text-align: left;
+                }
+                .compact-table th {
+                    background-color: #f2f2f2;
+                    font-weight: 600;
+                }
+                .compact-table tr.editing {
+                    background-color: #e6f3ff;
+                }
+                .compact-table [contenteditable="true"] {
+                    background-color: #fff;
+                    border: 2px solid #4CAF50;
+                    padding: 6px;
+                }
+                .invoice-summary {
+                    margin-top: 15px;
+                    font-size: 14px;
+                }
+                .invoice-summary .summary-row {
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 5px 0;
+                }
+                .invoice-summary .total {
+                    font-weight: bold;
+                    border-top: 1px solid #ddd;
+                    padding-top: 10px;
+                }
+                .invoice-navigation {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    display: flex;
+                    gap: 10px;
+                }
+                .invoice-navigation button {
+                    padding: 8px 12px;
+                    border: none;
+                    border-radius: 4px;
+                    background-color: #4CAF50;
+                    color: #fff;
+                    cursor: pointer;
+                    font-size: 14px;
+                }
+                .invoice-navigation button:disabled {
+                    background-color: #ccc;
+                    cursor: not-allowed;
+                }
+                .invoice-navigation button:hover:not(:disabled) {
+                    background-color: #45a049;
+                }
+            </style>
+            <div class="invoice-details-table">
+                <h4>Trích xuất hóa đơn ${invoice.series}-${invoice.number}</h4>
+                <div class="invoice-navigation">
+                    <button ${!prevInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${prevInvoiceId}')">⬅️ Hóa đơn trước</button>
+                                        <button ${!nextInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${nextInvoiceId}')">Hóa đơn tiếp theo ➡️</button>
+                </div>
+                <table class="compact-table">
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            <th>Tên hàng hóa</th>
+                            <th>Đơn vị</th>
+                            <th>Số lượng</th>
+                            <th>Đơn giá</th>
+                            <th>Chiết khấu</th>
+                            <th>Thuế suất</th>
+                            <th>Tiền thuế</th>
+                            <th>Thành tiền (đã bao gồm thuế)</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${invoice.items.map((item, index) => {
+            const qty = normalizeNumber(item.qty);
+            const price = normalizeNumber(item.price);
+            const discount = normalizeNumber(item.discount || '0');
+            const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
+            const itemTotalBeforeTax = qty * price - discount;
+            const itemTax = itemTotalBeforeTax * vatRate;
+            const itemTotal = itemTotalBeforeTax + itemTax;
+            return `
+                                <tr data-item-index="${index}" class="${item.isEditing ? 'editing' : ''}">
+                                    <td>${item.stt}</td>
+                                    <td data-field="name" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.name}</td>
+                                    <td data-field="unit" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.unit}</td>
+                                    <td data-field="qty" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.qty}</td>
+                                    <td data-field="price" ${item.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(item.price)}</td>
+                                    <td data-field="discount" ${item.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(item.discount || '0')}</td>
+                                    <td data-field="vat" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.vat || invoice.taxRate + '%'}</td>
+                                    <td>${formatMoney(itemTax)}</td>
+                                    <td>${formatMoney(itemTotal)}</td>
+                                    <td>
+                                        ${item.isEditing ? `
+                                            <button onclick="saveOrCancelInvoiceItem('${invoiceId}', ${index}, 'save')">💾</button>
+                                            <button onclick="saveOrCancelInvoiceItem('${invoiceId}', ${index}, 'cancel')">❌</button>
+                                        ` : `
+                                            <button onclick="editInvoiceItem('${invoiceId}', ${index})">✏️</button>
+                                            <button onclick="insertInvoiceItem('${invoiceId}', ${index})">➕</button>
+                                            <button onclick="deleteInvoiceItem('${invoiceId}', ${index})">🗑️</button>
+                                        `}
+                                    </td>
+                                </tr>
+                            `;
+        }).join('')}
+                    </tbody>
+                </table>
+                <div class="invoice-summary">
+                    <div class="summary-row">
+                        <span>Tổng tiền chưa thuế:</span>
+                        <span>${formatMoney(totalBeforeTax)} VND</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tổng cộng tiền thuế:</span>
+                        <span>${formatMoney(totalTax)} VND</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tổng tiền chiết khấu:</span>
+                        <span>${formatMoney(totalDiscount)} VND</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tổng giá trị bán:</span>
+                        <span>${formatMoney(totalSelling)} VND</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Tổng tiền thanh toán:</span>
+                        <span>${formatMoney(totalPayment)} VND</span>
+                    </div>
+                </div>
+                <button onclick="addInvoiceItem('${invoiceId}')">➕ Thêm dòng hàng hóa</button>
+            </div>
+        `;
+
+        const existingPopup = document.querySelector('.popup');
+        if (existingPopup) existingPopup.remove();
+
+        const popup = document.createElement('div');
+        popup.className = 'popup';
+        popup.innerHTML = `
+            <style>
+                .popup {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 999;
+                }
+                .popup-content {
+                    background: #fff;
+                    padding: 20px;
+                    border-radius: 8px;
+                    max-width: 90%;
+                    max-height: 90%;
+                    overflow: auto;
+                    display: flex;
+                    gap: 20px;
+                }
+                .invoice-comparison {
+                    display: flex;
+                    gap: 20px;
+                    width: 100%;
+                }
+                .invoice-pdf {
+                    flex: 1;
+                    max-width: 50%;
+                }
+                .invoice-pdf h4 {
+                    margin: 0 0 15px;
+                    font-size: 18px;
+                    color: #1a1a1a;
+                }
+                .pdf-container {
+                    position: relative;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    overflow: hidden;
+                }
+                .pdf-container iframe {
+                    border: none;
+                }
+                .magnifier {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100px;
+                    height: 100px;
+                    background: rgba(255, 255, 255, 0.8);
+                    border: 2px solid #4CAF50;
+                    border-radius: 50%;
+                    pointer-events: none;
+                    display: none;
+                    background-size: 200%;
+                    background-repeat: no-repeat;
+                }
+                .close-popup {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    background: #ff4444;
+                    color: #fff;
+                    border: none;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    padding: 5px 10px;
+                    font-size: 16px;
+                    line-height: 1;
+                }
+                .close-popup:hover {
+                    background: #d32f2f;
+                }
+            </style>
+            <div class="popup-content">
+                <span class="close-popup" onclick="this.parentElement.parentElement.remove()">❌</span>
+                <div class="invoice-comparison">
+                    <div class="invoice-pdf">
+                        <h4>Hóa đơn PDF</h4>
+                        <div class="pdf-container">
+                            <iframe src="${invoice.file || '#'}" width="100%" height="500px"></iframe>
+                            <div class="magnifier"></div>
+                        </div>
+                    </div>
+                    ${invoiceTable}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(popup);
+        setupMagnifier();
+
+        popup.addEventListener('click', (e) => {
+            if (e.target === popup) {
+                popup.remove();
+            }
+        });
+    } catch (e) {
+        console.error('Lỗi showInvoiceDetails:', e);
+        alert('Lỗi khi hiển thị hóa đơn: ' + e.message);
+    }
+}
+
+// Ensure navigateInvoice function exists for navigation buttons
+function navigateInvoice(invoiceId) {
+    if (invoiceId) {
+        showInvoiceDetails(invoiceId);
+    }
+}
+
+//popup Giá Bán
+function showUpdateSellingPricePopup() {
+    const popup = document.createElement('div');
+    popup.id = 'updateSellingPricePopup';
+    popup.className = 'popup';
+    popup.innerHTML = `
+        <style>
+            .popup {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.6);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+            }
+            .popup-content {
+                background: #ffffff;
+                padding: 24px;
+                border-radius: 10px;
+                max-width: 450px;
+                width: 90%;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            }
+            .popup-content h3 {
+                margin: 0 0 12px;
+                font-size: 20px;
+                color: #1a1a1a;
+                font-weight: 600;
+            }
+            .popup-content label {
+                display: block;
+                margin-bottom: 8px;
+                font-size: 15px;
+                color: #1a1a1a;
+                font-weight: 500;
+            }
+            .popup-content input[type="number"] {
+                width: 100%;
+                padding: 10px;
+                margin-bottom: 20px;
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                font-size: 14px;
+                box-sizing: border-box;
+                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+                transition: border-color 0.3s;
+            }
+            .popup-content input[type="number"]:focus {
+                border-color: #4CAF50;
+                outline: none;
+            }
+            .popup-actions {
+                display: flex;
+                justify-content: flex-end;
+                gap: 12px;
+            }
+            .popup-actions button {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: background-color 0.3s, transform 0.1s;
+            }
+            .popup-actions button:first-child {
+                background-color: #4CAF50;
+                color: #ffffff;
+            }
+            .popup-actions button:first-child:hover {
+                background-color: #45a049;
+                transform: translateY(-1px);
+            }
+            .popup-actions button:last-child {
+                background-color: #f44336;
+                color: #ffffff;
+            }
+            .popup-actions button:last-child:hover {
+                background-color: #d32f2f;
+                transform: translateY(-1px);
+            }
+        </style>
+        <div class="popup-content">
+            <h3>Cập nhật giá bán tồn kho</h3>
+            <label for="percentageInput">Phần trăm tăng (%):</label>
+            <input type="number" id="percentageInput" placeholder="VD: 10" step="0.1" min="0" value="${localStorage.getItem('sellingPricePercentage') || '10'}">
+            <label for="fixedAmountInput">Số tiền cố định (VNĐ):</label>
+            <input type="number" id="fixedAmountInput" placeholder="VD: 3000" step="100" min="0" value="${localStorage.getItem('sellingPriceFixedAmount') || '3000'}">
+            <div class="popup-actions">
+                <button onclick="updateSellingPrice()">💾 Áp dụng</button>
+                <button onclick="closeUpdateSellingPricePopup()">❌ Hủy</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+    document.getElementById('percentageInput').focus();
+}
+
+function updateSellingPrice() {
+    try {
+        const businessId = document.querySelector('.sidebar li.active')?.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+        if (!businessId) {
+            alert('Vui lòng chọn Hộ Kinh Doanh trước khi cập nhật giá bán!');
+            return;
+        }
+
+        const percentage = parseFloat(document.getElementById('percentageInput').value) / 100 || 0.10;
+        const fixedAmount = parseFloat(document.getElementById('fixedAmountInput').value) || 3000;
+
+        if (isNaN(percentage) || isNaN(fixedAmount) || percentage < 0 || fixedAmount < 0) {
+            alert('Vui lòng nhập phần trăm và số tiền cố định hợp lệ!');
+            return;
+        }
+
+        console.log('updateSellingPrice:', { businessId, percentage, fixedAmount });
+
+        localStorage.setItem('sellingPricePercentage', percentage);
+        localStorage.setItem('sellingPriceFixedAmount', fixedAmount);
+
+        console.log('localStorage:', {
+            sellingPricePercentage: localStorage.getItem('sellingPricePercentage'),
+            sellingPriceFixedAmount: localStorage.getItem('sellingPriceFixedAmount')
+        });
+
+        saveCurrentState();
+
+        let updatedItems = 0;
+        inventory = inventory.map(item => {
+            if (item.businessId === businessId) {
+                const price = normalizeNumber(item.price);
+                if (isNaN(price)) {
+                    console.warn(`Giá không hợp lệ cho item ${item.name}:`, item.price);
+                    return item;
+                }
+                const giaBan = calculateSellingPrice(price);
+                console.log('Cập nhật item:', { id: item.id, name: item.name, price, giaBan });
+                updatedItems++;
+                return {
+                    ...item,
+                    giaBan: formatMoney(giaBan),
+                    lastUpdated: new Date().toISOString()
+                };
+            }
+            return item;
+        });
+
+        localStorage.setItem('inventory', JSON.stringify(inventory));
+
+        logActivity('update_selling_price', {
+            businessId,
+            updatedItems,
+            percentage,
+            fixedAmount
+        });
+
+        showBusinessDetails(businessId);
+        showPriceList(businessId);
+        showExportHistory(businessId);
+        closeUpdateSellingPricePopup();
+        alert(`Đã cập nhật giá bán cho ${updatedItems} mặt hàng thành công!`);
+    } catch (e) {
+        console.error('Lỗi updateSellingPrice:', e);
+        alert('Lỗi khi cập nhật giá bán: ' + e.message);
+    }
+}
+
+
+function closeUpdateSellingPricePopup() {
+    const popup = document.getElementById('updateSellingPricePopup');
+    if (popup) popup.remove();
+}
 ///////////////////////////////
+
