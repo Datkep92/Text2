@@ -1123,18 +1123,6 @@ function insertInventoryItem(businessId, afterId) {
 }
 
 
-// =============================================
-// 6. QUẢN LÝ HÓA ĐƠN (INVOICES)
-// =============================================
-
-
-// Giữ nguyên hàm checkInvoiceItem từ code mới
-function checkInvoiceItem(item) {
-    if (!item.unit || /\d/.test(item.unit.trim())) return true;
-    if (!item.qty || !/^\d+(?:,\d+)?$/.test(item.qty.toString().replace(/\s/g, ''))) return true;
-    if (normalizeNumber(item.total) === 0) return true;
-    return false;
-}
 
 // Cập nhật hàm editInvoiceItem để hỗ trợ focus tốt hơn
 function editInvoiceItem(invoiceId, itemIndex) {
@@ -1635,60 +1623,381 @@ document.getElementById('invoicesTab').innerHTML = `
   </div>
 ` + document.getElementById('invoicesTab').innerHTML;
 
-function showInvoicesTab(businessId) {
-    try {
-        const invoicesTab = document.getElementById('invoicesTab');
-        if (!invoicesTab) return;
+// Biến toàn cục
+let currentFilterType = 'all';
 
-        invoicesTab.innerHTML = `
-            <div class="section">
-                <h4>Danh sách hóa đơn</h4>
-                <div class="invoice-controls">
-                    <!-- Thêm 3 nút phân loại -->
-                    <div class="filter-buttons">
-                        <button class="active" onclick="filterInvoicesByType('all', '${businessId}')">Tất cả</button>
-                        <button onclick="filterInvoicesByType('valid', '${businessId}')">HĐ hợp lệ</button>
-                        <button onclick="filterInvoicesByType('warning', '${businessId}')">HĐ cảnh báo</button>
-                        <button onclick="filterInvoicesByType('error', '${businessId}')">HĐ lỗi</button>
-                    </div>
-                    
-                    <!-- Ô tìm kiếm nâng cao -->
-                    <div class="search-box">
-                        <input type="text" id="invoiceSearchInput" placeholder="Tìm theo số HĐ, MCCQT...">
-                        <button onclick="searchInvoices('${businessId}')">🔍 Tìm kiếm</button>
-                        <button onclick="showAdvancedSearch('${businessId}')">🎚️ Tìm nâng cao</button>
-                    </div>
+
+// Hàm hỗ trợ lấy văn bản nút
+function getButtonText(type) {
+    switch (type) {
+        case 'all': return 'Tất cả';
+        case 'valid': return 'HĐ hợp lệ';
+        case 'warning': return 'HĐ cảnh báo';
+        case 'error': return 'HĐ lỗi';
+        case 'unknown': return 'HĐ không rõ';
+        default: return 'Tất cả';
+    }
+}
+// Hàm hiển thị chi tiết hóa đơn, thêm nút Cập nhật cho Số hóa đơn và MCCQT
+function showInvoiceDetails(invoiceId) {
+    try {
+        const invoice = invoices.find(i => i.id === invoiceId);
+        if (!invoice) {
+            console.error(`Không tìm thấy hóa đơn với ID ${invoiceId}`);
+            alert('Hóa đơn không tồn tại!');
+            return;
+        }
+
+        const businessInvoices = invoices.filter(i => i.businessId === invoice.businessId)
+            .sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+        const currentIndex = businessInvoices.findIndex(i => i.id === invoiceId);
+        const prevInvoiceId = currentIndex > 0 ? businessInvoices[currentIndex - 1].id : null;
+        const nextInvoiceId = currentIndex < businessInvoices.length - 1 ? businessInvoices[currentIndex + 1].id : null;
+
+        let totalBeforeTax = 0;
+        let totalTax = 0;
+        let totalDiscount = 0;
+        let totalPayment = 0;
+        let totalSelling = 0;
+
+        invoice.items.forEach(item => {
+            const qty = normalizeNumber(item.qty);
+            const price = normalizeNumber(item.price);
+            const discount = normalizeNumber(item.discount || '0');
+            const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
+
+            const itemTotalBeforeTax = qty * price - discount;
+            const itemTax = itemTotalBeforeTax * vatRate;
+            const itemTotal = itemTotalBeforeTax + itemTax;
+
+            totalBeforeTax += itemTotalBeforeTax;
+            totalTax += itemTax;
+            totalDiscount += discount;
+            totalPayment += itemTotal;
+            totalSelling += qty * calculateSellingPrice(price);
+        });
+
+        const invoiceTable = `
+            <style>
+                .invoice-details-table {
+                    flex: 1;
+                    padding: 20px;
+                    background: #fff;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                }
+                .invoice-details-table h4 {
+                    margin: 0 0 15px;
+                    font-size: 18px;
+                    color: #1a1a1a;
+                }
+                .compact-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 14px;
+                }
+                .compact-table th, .compact-table td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    text-align: left;
+                }
+                .compact-table th {
+                    background-color: #f2f2f2;
+                    font-weight: 600;
+                }
+                .invoice-info p {
+                    margin: 5px 0;
+                }
+                .invoice-navigation {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    display: flex;
+                    gap: 10px;
+                }
+                .invoice-navigation button {
+                    padding: 8px 12px;
+                    border: none;
+                    border-radius: 4px;
+                    background-color: #4CAF50;
+                    color: #fff;
+                    cursor: pointer;
+                    font-size: 14px;
+                }
+                .invoice-navigation button:disabled {
+                    background-color: #ccc;
+                    cursor: not-allowed;
+                }
+                .business-select {
+                    width: 200px;
+                    padding: 5px;
+                    font-size: 14px;
+                }
+                .form-group {
+                    margin-bottom: 10px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+                .form-group label {
+                    width: 100px;
+                    font-weight: bold;
+                }
+                .form-group input {
+                    padding: 5px;
+                    width: 200px;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                }
+                .form-group button {
+                    padding: 5px 10px;
+                    border: none;
+                    border-radius: 4px;
+                    background-color: #4CAF50;
+                    color: #fff;
+                    cursor: pointer;
+                }
+                .form-group button:hover {
+                    background-color: #45a049;
+                }
+            </style>
+            <div class="invoice-details-table">
+                <h4>Trích xuất hóa đơn ${invoice.series}-${invoice.number}</h4>
+                <div class="invoice-navigation">
+                    <button ${!prevInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${prevInvoiceId}')">⬅️ Hóa đơn trước</button>
+                    <button ${!nextInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${nextInvoiceId}')">Hóa đơn tiếp theo ➡️</button>
                 </div>
                 
-                <div id="invoiceListContainer">
-                    <!-- Nội dung hóa đơn sẽ được tải ở đây -->
+                <div class="invoice-info">
+                    <p><strong>NGƯỜI MUA:</strong></p>
+                    <p>Tên: ${invoice.seller.name}</p>
+                    <p>MST: 
+                        <select id="businessSelect" class="business-select" onchange="updateSelectedBusiness('${invoiceId}')">
+                            <option value="">-- Chọn HKD --</option>
+                            ${businesses.map(b => `
+                                <option value="${b.id}" ${b.id === invoice.businessId ? 'selected' : ''}>
+                                    ${b.name} (MST: ${b.taxCode})
+                                </option>
+                            `).join('')}
+                        </select>
+                    </p>
+                    <p>Địa chỉ: ${invoice.seller.address}</p>
+                    <button onclick="updateInvoiceMST('${invoiceId}')">💾 Cập nhật HKD</button>
                 </div>
+                <div class="form-group">
+                    <label>Số hóa đơn:</label>
+                    <input type="text" id="editInvoiceNumber" value="${invoice.number || ''}">
+                </div>
+                <div class="form-group">
+                    <label>MCCQT:</label>
+                    <input type="text" id="editMCCQT" value="${invoice.mccqt || ''}">
+                    <button onclick="saveInvoiceChanges('${invoiceId}', '${invoice.businessId}')">Cập nhật</button>
+                </div>
+                <table class="compact-table">
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            <th>Tên hàng hóa</th>
+                            <th>Đơn vị</th>
+                            <th>Số lượng</th>
+                            <th>Đơn giá</th>
+                            <th>Chiết khấu</th>
+                            <th>Thuế suất</th>
+                            <th>Tiền thuế</th>
+                            <th>Thành tiền</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${invoice.items.map((item, index) => {
+            const qty = normalizeNumber(item.qty);
+            const price = normalizeNumber(item.price);
+            const discount = normalizeNumber(item.discount || '0');
+            const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
+            const itemTotalBeforeTax = qty * price - discount;
+            const itemTax = itemTotalBeforeTax * vatRate;
+            const itemTotal = itemTotalBeforeTax + itemTax;
+            return `
+                                <tr data-item-index="${index}" class="${item.isEditing ? 'editing' : ''}">
+                                    <td>${item.stt}</td>
+                                    <td data-field="name" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.name}</td>
+                                    <td data-field="unit" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.unit}</td>
+                                    <td data-field="qty" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.qty}</td>
+                                    <td data-field="price" ${item.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(item.price)}</td>
+                                    <td data-field="discount" ${item.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(item.discount || '0')}</td>
+                                    <td data-field="vat" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.vat || invoice.taxRate + '%'}</td>
+                                    <td>${formatMoney(itemTax)}</td>
+                                    <td>${formatMoney(itemTotal)}</td>
+                                    <td>
+                                        ${item.isEditing ? `
+                                            <button onclick="saveOrCancelInvoiceItem('${invoiceId}', ${index}, 'save')">💾</button>
+                                            <button onclick="saveOrCancelInvoiceItem('${invoiceId}', ${index}, 'cancel')">❌</button>
+                                        ` : `
+                                            <button onclick="editInvoiceItem('${invoiceId}', ${index})">✏️</button>
+                                            <button onclick="insertInvoiceItem('${invoiceId}', ${index})">➕</button>
+                                            <button onclick="deleteInvoiceItem('${invoiceId}', ${index})">🗑️</button>
+                                        `}
+                                    </td>
+                                </tr>
+                            `;
+        }).join('')}
+                    </tbody>
+                </table>
+                <div class="invoice-summary">
+                    <div class="summary-row">
+                        <span>Tổng tiền chưa thuế:</span>
+                        <span>${formatMoney(totalBeforeTax)} VND</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tổng cộng tiền thuế:</span>
+                        <span>${formatMoney(totalTax)} VND</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tổng tiền chiết khấu:</span>
+                        <span>${formatMoney(totalDiscount)} VND</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tổng giá trị bán:</span>
+                        <span>${formatMoney(totalSelling)} VND</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Tổng tiền thanh toán:</span>
+                        <span>${formatMoney(totalPayment)} VND</span>
+                    </div>
+                </div>
+                <button onclick="addInvoiceItem('${invoiceId}')">➕ Thêm dòng hàng hóa</button>
             </div>
         `;
 
-        // Tải danh sách hóa đơn ban đầu
-        loadInvoiceList(businessId, 'all');
+        const existingPopup = document.querySelector('.popup');
+        if (existingPopup) existingPopup.remove();
+
+        const popup = document.createElement('div');
+        popup.className = 'popup';
+        popup.innerHTML = `
+            <style>
+                .popup {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 999;
+                }
+                .popup-content {
+                    background: #fff;
+                    padding: 20px;
+                    border-radius: 8px;
+                    max-width: 90%;
+                    max-height: 90%;
+                    overflow: auto;
+                    display: flex;
+                    gap: 20px;
+                }
+                .invoice-comparison {
+                    display: flex;
+                    gap: 20px;
+                    width: 100%;
+                }
+                .invoice-pdf {
+                    flex: 1;
+                    max-width: 50%;
+                }
+                .close-popup {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    background: #ff4444;
+                    color: #fff;
+                    border: none;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    padding: 5px 10px;
+                    font-size: 16px;
+                }
+            </style>
+            <div class="popup-content">
+                <span class="close-popup" onclick="this.parentElement.parentElement.remove()">❌</span>
+                <div class="invoice-comparison">
+                    <div class="invoice-pdf">
+                        <h4>Hóa đơn PDF</h4>
+                        <div class="pdf-container">
+                            <iframe src="${invoice.file || '#'}" width="100%" height="500px"></iframe>
+                            <div class="magnifier"></div>
+                        </div>
+                    </div>
+                    ${invoiceTable}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(popup);
+        setupMagnifier();
+
+        popup.addEventListener('click', (e) => {
+            if (e.target === popup) {
+                popup.remove();
+            }
+        });
     } catch (e) {
-        console.error('Lỗi showInvoicesTab:', e);
+        console.error('Lỗi showInvoiceDetails:', e);
+        alert('Lỗi khi hiển thị hóa đơn: ' + e.message);
     }
 }
 
-function getStatusIcon(statusColor) {
-    switch (statusColor) {
-        case 'white': return '✅';
-        case 'yellow': return '⚠️';
-        case 'red': return '❌';
-        default: return '🔘';
+// Hàm lưu thay đổi Số hóa đơn và MCCQT
+function saveInvoiceChanges(invoiceId, businessId) {
+    try {
+        const invoice = invoices.find(i => i.id === invoiceId);
+        if (!invoice) {
+            alert('Không tìm thấy hóa đơn!');
+            return;
+        }
+
+        const newNumber = document.getElementById('editInvoiceNumber').value.trim();
+        const newMCCQT = document.getElementById('editMCCQT').value.trim();
+
+        if (!newNumber) {
+            alert('Số hóa đơn không được để trống!');
+            return;
+        }
+
+        // Lưu trạng thái trước khi thay đổi để hỗ trợ undo
+        saveCurrentState();
+
+        // Cập nhật thông tin hóa đơn
+        const oldNumber = invoice.number;
+        const oldMCCQT = invoice.mccqt;
+        invoice.number = newNumber;
+        invoice.mccqt = newMCCQT || 'Không rõ';
+
+        // Lưu vào localStorage
+        localStorage.setItem('invoices', JSON.stringify(invoices));
+
+        // Ghi log hoạt động
+        logActivity('edit_invoice', {
+            invoiceId,
+            businessId,
+            oldNumber,
+            newNumber,
+            oldMCCQT,
+            newMCCQT
+        });
+
+        // Cập nhật tiêu đề hóa đơn và làm mới danh sách
+        const title = document.querySelector('.invoice-details-table h4');
+        if (title) {
+            title.textContent = `Trích xuất hóa đơn ${invoice.series}-${invoice.number}`;
+        }
+        loadInvoiceList(businessId, currentFilterType);
+        alert('Đã cập nhật hóa đơn thành công!');
+    } catch (e) {
+        console.error('Lỗi saveInvoiceChanges:', e);
+        alert('Lỗi khi lưu thay đổi: ' + e.message);
     }
-}
-
-// Hàm phân loại hóa đơn
-function filterInvoicesByType(type, businessId) {
-    const buttons = document.querySelectorAll('.filter-buttons button');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-
-    loadInvoiceList(businessId, type);
 }
 
 // Hàm tải danh sách hóa đơn
@@ -1718,6 +2027,153 @@ function loadInvoiceList(businessId, filterType = 'all') {
         container.innerHTML = renderInvoiceList(filtered);
     }
 }
+
+
+// Các hàm khác (giữ nguyên)
+function showInvoicesTab(businessId) {
+    try {
+        const invoicesTab = document.getElementById('invoicesTab');
+        if (!invoicesTab) return;
+
+        invoicesTab.innerHTML = `
+            <div class="section">
+                <h4>Danh sách hóa đơn</h4>
+                <div class="invoice-controls">
+                    <div class="filter-buttons">
+                        <button class="${currentFilterType === 'all' ? 'active' : ''}" onclick="filterInvoicesByType('all', '${businessId}')">Tất cả</button>
+                        <button class="${currentFilterType === 'valid' ? 'active' : ''}" onclick="filterInvoicesByType('valid', '${businessId}')">HĐ hợp lệ</button>
+                        <button class="${currentFilterType === 'warning' ? 'active' : ''}" onclick="filterInvoicesByType('warning', '${businessId}')">HĐ cảnh báo</button>
+                        <button class="${currentFilterType === 'error' ? 'active' : ''}" onclick="filterInvoicesByType('error', '${businessId}')">HĐ lỗi</button>
+                        <button class="${currentFilterType === 'unknown' ? 'active' : ''}" onclick="filterInvoicesByType('unknown', '${businessId}')">HĐ không rõ</button>
+                    </div>
+                    <div class="search-box">
+                        <input type="text" id="invoiceSearchInput" placeholder="Tìm theo số HĐ, MCCQT...">
+                        <button onclick="searchInvoices('${businessId}')">🔍 Tìm kiếm</button>
+                        <button onclick="showAdvancedSearch('${businessId}')">🎚️ Tìm nâng cao</button>
+                    </div>
+                </div>
+                <div id="invoiceListContainer">
+                    <!-- Nội dung hóa đơn sẽ được tải ở đây -->
+                </div>
+            </div>
+        `;
+
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .valid-row { background-color: #e6ffe6; }
+            .warning-row { background-color: #fff3cd; }
+            .error-row { background-color: #ffcccc; }
+            .unknown-row { background-color: #ffe6e6; }
+            .filter-buttons button {
+                padding: 8px 12px;
+                border: none;
+                border-radius: 4px;
+                background-color: #4CAF50;
+                color: #fff;
+                cursor: pointer;
+                font-size: 14px;
+                margin-right: 5px;
+            }
+            .filter-buttons button.active {
+                background-color: #2196F3;
+            }
+            .filter-buttons button:hover {
+                background-color: #45a049;
+            }
+            .filter-buttons button.active:hover {
+                background-color: #1976D2;
+            }
+            .invoice-controls {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 10px;
+            }
+            .search-box {
+                display: flex;
+                gap: 10px;
+            }
+        `;
+        document.head.appendChild(style);
+
+        loadInvoiceList(businessId, currentFilterType);
+    } catch (e) {
+        console.error('Lỗi showInvoicesTab:', e);
+    }
+}
+
+function filterInvoicesByType(type, businessId) {
+    try {
+        currentFilterType = type;
+        loadInvoiceList(businessId, type);
+        const buttons = document.querySelectorAll('.filter-buttons button');
+        buttons.forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.textContent === getButtonText(type)) {
+                btn.classList.add('active');
+            }
+        });
+        logActivity('filter_invoices', { businessId, filterType: type });
+    } catch (e) {
+        console.error('Lỗi filterInvoicesByType:', e);
+    }
+}
+
+function getButtonText(type) {
+    switch (type) {
+        case 'all': return 'Tất cả';
+        case 'valid': return 'HĐ hợp lệ';
+        case 'warning': return 'HĐ cảnh báo';
+        case 'error': return 'HĐ lỗi';
+        case 'unknown': return 'HĐ không rõ';
+        default: return 'Tất cả';
+    }
+}
+
+// Hàm kiểm tra trạng thái hóa đơn
+function checkInvoiceStatus(invoice) {
+    try {
+        // Trạng thái "Thiếu": cả mccqt và seller.taxCode đều thiếu hoặc là "Không rõ"
+        if ((invoice.mccqt === 'Không rõ' || !invoice.mccqt) && (invoice.seller.taxCode === 'Không rõ' || !invoice.seller.taxCode)) {
+            return 'missing';
+        }
+        // Trạng thái "Lỗi": dựa trên logic cũ kiểm tra các mục hàng hóa
+        if (invoice.items.some(item => checkInvoiceItem(item))) {
+            return 'error';
+        }
+        // Trạng thái "Hợp lệ": nếu không có lỗi hoặc thiếu
+        return 'valid';
+    } catch (e) {
+        console.error('Lỗi checkInvoiceStatus:', e);
+        return 'error';
+    }
+}
+
+function checkInvoiceItem(item) {
+    if (!item.unit || /\d/.test(item.unit.trim())) return true;
+    if (!item.qty || !/^\d+(?:,\d+)?$/.test(item.qty.toString().replace(/\s/g, ''))) return true;
+    if (normalizeNumber(item.total) === 0) return true;
+    return false;
+}
+
+function getStatusIcon(statusColor) {
+    switch (statusColor) {
+        case 'white': return '✅';
+        case 'yellow': return '⚠️';
+        case 'red': return '❌';
+        default: return '🔘';
+    }
+}
+
+// Hàm phân loại hóa đơn
+function filterInvoicesByType(type, businessId) {
+    const buttons = document.querySelectorAll('.filter-buttons button');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+
+    loadInvoiceList(businessId, type);
+}
+
+
 
 // Hàm render danh sách hóa đơn
 function renderInvoiceList(invoices) {
@@ -5935,278 +6391,7 @@ function transferInvoice(invoiceId, fromBusinessId, toBusinessId) {
         alert('Lỗi khi chuyển hóa đơn: ' + e.message);
     }
 }
-// Modified showInvoiceDetails function to include CSS and reposition navigation buttons
-function showInvoiceDetails(invoiceId) {
-    try {
-        const invoice = invoices.find(i => i.id === invoiceId);
-        if (!invoice) {
-            console.error(`Không tìm thấy hóa đơn với ID ${invoiceId}`);
-            alert('Hóa đơn không tồn tại!');
-            return;
-        }
 
-        const businessInvoices = invoices.filter(i => i.businessId === invoice.businessId)
-            .sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-        const currentIndex = businessInvoices.findIndex(i => i.id === invoiceId);
-        const prevInvoiceId = currentIndex > 0 ? businessInvoices[currentIndex - 1].id : null;
-        const nextInvoiceId = currentIndex < businessInvoices.length - 1 ? businessInvoices[currentIndex + 1].id : null;
-
-        let totalBeforeTax = 0;
-        let totalTax = 0;
-        let totalDiscount = 0;
-        let totalPayment = 0;
-        let totalSelling = 0;
-
-        invoice.items.forEach(item => {
-            const qty = normalizeNumber(item.qty);
-            const price = normalizeNumber(item.price);
-            const discount = normalizeNumber(item.discount || '0');
-            const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
-
-            const itemTotalBeforeTax = qty * price - discount;
-            const itemTax = itemTotalBeforeTax * vatRate;
-            const itemTotal = itemTotalBeforeTax + itemTax;
-
-            totalBeforeTax += itemTotalBeforeTax;
-            totalTax += itemTax;
-            totalDiscount += discount;
-            totalPayment += itemTotal;
-            totalSelling += qty * calculateSellingPrice(price);
-        });
-
-        const invoiceTable = `
-            <style>
-                .invoice-details-table {
-                    flex: 1;
-                    padding: 20px;
-                    background: #fff;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                }
-                .invoice-details-table h4 {
-                    margin: 0 0 15px;
-                    font-size: 18px;
-                    color: #1a1a1a;
-                }
-                .compact-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 14px;
-                }
-                .compact-table th, .compact-table td {
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                    text-align: left;
-                }
-                .compact-table th {
-                    background-color: #f2f2f2;
-                    font-weight: 600;
-                }
-                .invoice-info p {
-                    margin: 5px 0;
-                }
-                .invoice-navigation {
-                    position: absolute;
-                    top: 10px;
-                    right: 10px;
-                    display: flex;
-                    gap: 10px;
-                }
-                .invoice-navigation button {
-                    padding: 8px 12px;
-                    border: none;
-                    border-radius: 4px;
-                    background-color: #4CAF50;
-                    color: #fff;
-                    cursor: pointer;
-                    font-size: 14px;
-                }
-                .invoice-navigation button:disabled {
-                    background-color: #ccc;
-                    cursor: not-allowed;
-                }
-                .business-select {
-                    width: 200px;
-                    padding: 5px;
-                    font-size: 14px;
-                }
-            </style>
-            <div class="invoice-details-table">
-                <h4>Trích xuất hóa đơn ${invoice.series}-${invoice.number}</h4>
-                <div class="invoice-navigation">
-                    <button ${!prevInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${prevInvoiceId}')">⬅️ Hóa đơn trước</button>
-                    <button ${!nextInvoiceId ? 'disabled' : ''} onclick="navigateInvoice('${nextInvoiceId}')">Hóa đơn tiếp theo ➡️</button>
-                </div>
-                <div class="invoice-info">
-                    <p><strong>NGƯỜI MUA:</strong></p>
-                    <p>Tên: ${invoice.seller.name}</p>
-                    <p>MST: 
-                        <select id="businessSelect" class="business-select" onchange="updateSelectedBusiness('${invoiceId}')">
-                            <option value="">-- Chọn HKD --</option>
-                            ${businesses.map(b => `
-                                <option value="${b.id}" ${b.id === invoice.businessId ? 'selected' : ''}>
-                                    ${b.name} (MST: ${b.taxCode})
-                                </option>
-                            `).join('')}
-                        </select>
-                    </p>
-                    <p>Địa chỉ: ${invoice.seller.address}</p>
-                    <button onclick="updateInvoiceMST('${invoiceId}')">💾 Cập nhật HKD</button>
-                </div>
-                <table class="compact-table">
-                    <thead>
-                        <tr>
-                            <th>STT</th>
-                            <th>Tên hàng hóa</th>
-                            <th>Đơn vị</th>
-                            <th>Số lượng</th>
-                            <th>Đơn giá</th>
-                            <th>Chiết khấu</th>
-                            <th>Thuế suất</th>
-                            <th>Tiền thuế</th>
-                            <th>Thành tiền</th>
-                            <th>Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${invoice.items.map((item, index) => {
-            const qty = normalizeNumber(item.qty);
-            const price = normalizeNumber(item.price);
-            const discount = normalizeNumber(item.discount || '0');
-            const vatRate = parseFloat((item.vat || invoice.taxRate || '10').replace('%', '')) / 100;
-            const itemTotalBeforeTax = qty * price - discount;
-            const itemTax = itemTotalBeforeTax * vatRate;
-            const itemTotal = itemTotalBeforeTax + itemTax;
-            return `
-                                <tr data-item-index="${index}" class="${item.isEditing ? 'editing' : ''}">
-                                    <td>${item.stt}</td>
-                                    <td data-field="name" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.name}</td>
-                                    <td data-field="unit" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.unit}</td>
-                                    <td data-field="qty" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.qty}</td>
-                                    <td data-field="price" ${item.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(item.price)}</td>
-                                    <td data-field="discount" ${item.isEditing ? 'contenteditable="true"' : ''}>${formatMoney(item.discount || '0')}</td>
-                                    <td data-field="vat" ${item.isEditing ? 'contenteditable="true"' : ''}>${item.vat || invoice.taxRate + '%'}</td>
-                                    <td>${formatMoney(itemTax)}</td>
-                                    <td>${formatMoney(itemTotal)}</td>
-                                    <td>
-                                        ${item.isEditing ? `
-                                            <button onclick="saveOrCancelInvoiceItem('${invoiceId}', ${index}, 'save')">💾</button>
-                                            <button onclick="saveOrCancelInvoiceItem('${invoiceId}', ${index}, 'cancel')">❌</button>
-                                        ` : `
-                                            <button onclick="editInvoiceItem('${invoiceId}', ${index})">✏️</button>
-                                            <button onclick="insertInvoiceItem('${invoiceId}', ${index})">➕</button>
-                                            <button onclick="deleteInvoiceItem('${invoiceId}', ${index})">🗑️</button>
-                                        `}
-                                    </td>
-                                </tr>
-                            `;
-        }).join('')}
-                    </tbody>
-                </table>
-                <div class="invoice-summary">
-                    <div class="summary-row">
-                        <span>Tổng tiền chưa thuế:</span>
-                        <span>${formatMoney(totalBeforeTax)} VND</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Tổng cộng tiền thuế:</span>
-                        <span>${formatMoney(totalTax)} VND</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Tổng tiền chiết khấu:</span>
-                        <span>${formatMoney(totalDiscount)} VND</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Tổng giá trị bán:</span>
-                        <span>${formatMoney(totalSelling)} VND</span>
-                    </div>
-                    <div class="summary-row total">
-                        <span>Tổng tiền thanh toán:</span>
-                        <span>${formatMoney(totalPayment)} VND</span>
-                    </div>
-                </div>
-                <button onclick="addInvoiceItem('${invoiceId}')">➕ Thêm dòng hàng hóa</button>
-            </div>
-        `;
-
-        const existingPopup = document.querySelector('.popup');
-        if (existingPopup) existingPopup.remove();
-
-        const popup = document.createElement('div');
-        popup.className = 'popup';
-        popup.innerHTML = `
-            <style>
-                .popup {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0, 0, 0, 0.5);
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    z-index: 999;
-                }
-                .popup-content {
-                    background: #fff;
-                    padding: 20px;
-                    border-radius: 8px;
-                    max-width: 90%;
-                    max-height: 90%;
-                    overflow: auto;
-                    display: flex;
-                    gap: 20px;
-                }
-                .invoice-comparison {
-                    display: flex;
-                    gap: 20px;
-                    width: 100%;
-                }
-                .invoice-pdf {
-                    flex: 1;
-                    max-width: 50%;
-                }
-                .close-popup {
-                    position: absolute;
-                    top: 10px;
-                    right: 10px;
-                    background: #ff4444;
-                    color: #fff;
-                    border: none;
-                    border-radius: 3px;
-                    cursor: pointer;
-                    padding: 5px 10px;
-                    font-size: 16px;
-                }
-            </style>
-            <div class="popup-content">
-                <span class="close-popup" onclick="this.parentElement.parentElement.remove()">❌</span>
-                <div class="invoice-comparison">
-                    <div class="invoice-pdf">
-                        <h4>Hóa đơn PDF</h4>
-                        <div class="pdf-container">
-                            <iframe src="${invoice.file || '#'}" width="100%" height="500px"></iframe>
-                            <div class="magnifier"></div>
-                        </div>
-                    </div>
-                    ${invoiceTable}
-                </div>
-            </div>
-        `;
-        document.body.appendChild(popup);
-        setupMagnifier();
-
-        popup.addEventListener('click', (e) => {
-            if (e.target === popup) {
-                popup.remove();
-            }
-        });
-    } catch (e) {
-        console.error('Lỗi showInvoiceDetails:', e);
-        alert('Lỗi khi hiển thị hóa đơn: ' + e.message);
-    }
-}
 
 // Ensure navigateInvoice function exists for navigation buttons
 function navigateInvoice(invoiceId) {
