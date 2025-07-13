@@ -581,59 +581,41 @@ function showBusinessDetails(taxCode) {
 
     mainContent.innerHTML = `
         <div class="hkd-summary-grid">
-<div class="hkd-report-filters">
-  <label>Từ ngày: <input type="date" id="reportFrom-${taxCode}"></label>
-  <label>Đến ngày: <input type="date" id="reportTo-${taxCode}"></label>
-  <button onclick="applyHKDReportFilter('${taxCode}')">📊 Áp dụng</button>
-  <button onclick="printHKDSummary('${taxCode}')">🖨️ In báo cáo</button>
-</div>
- <div class="summary-box full-row">
-    <div class="label">🧾 <b>CHI TIẾT HKD/ DOANH NGHIỆP</b></div>
-  </div>
-<div id="filteredSummary-${taxCode}"></div>
-
-            <div class="hkd-summary-grid">
-  <div class="summary-box">
-    <div class="label">📦 Tổng số lượng</div>
-    <div class="value" id="${taxCode}-summary-totalQuantity">${formatNumber(totalQuantity)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">💼 Tổng tồn kho (giá gốc)</div>
-    <div class="value" id="${taxCode}-summary-totalAmount">${formatCurrency(totalAmount)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">💰 Tổng giá bán</div>
-    <div class="value" id="${taxCode}-summary-totalSelling">${formatCurrency(totalSellingAmount)}</div>
-  </div>
-<div class="summary-box">
-    <div class="label">🧾 Tổng Hóa Đơn</div>
-    <div class="value" id="${taxCode}-summary-total">${formatCurrency(totalInvoiceAmount)}</div>
-  </div>
-  <div class="summary-box">
-    <div class="label">💵 HĐ Chưa thuế</div>
-    <div class="value" id="${taxCode}-summary-beforeTax">${formatCurrency(totalInvoiceBeforeTax)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">💸 Thuế GTGT</div>
-    <div class="value" id="${taxCode}-summary-tax">${formatCurrency(totalInvoiceTax)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">📦 Phí</div>
-    <div class="value" id="${taxCode}-summary-fee">${formatCurrency(totalInvoiceFee)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">🎁 Chiết khấu</div>
-    <div class="value" id="${taxCode}-summary-discount">${formatCurrency(totalInvoiceDiscount)}</div>
-  </div>
-
-  
-
-
+            <div class="summary-box">
+                <div class="label">📦 Tổng số lượng hàng hóa</div>
+                <div class="value">${formatNumber(totalQuantity)}</div>
+            </div>
+            <div class="summary-box">
+                <div class="label">💼 Tổng tồn kho (giá gốc)</div>
+                <div class="value">${formatCurrency(totalAmount)}</div>
+            </div>
+            <div class="summary-box">
+                <div class="label">💰 Tổng giá bán</div>
+                <div class="value">${formatCurrency(totalSellingAmount)}</div>
+            </div>
+            <div class="summary-box full-row">
+                <div class="label">🧾 <b>TỔNG TIỀN IN TRÊN HÓA ĐƠN</b></div>
+            </div>
+            <div class="summary-box">
+                <div class="label">💵 Chưa thuế</div>
+                <div class="value">${formatCurrency(totalInvoiceBeforeTax)}</div>
+            </div>
+            <div class="summary-box">
+                <div class="label">💸 Thuế GTGT</div>
+                <div class="value">${formatCurrency(totalInvoiceTax)}</div>
+            </div>
+            <div class="summary-box">
+                <div class="label">📦 Phí</div>
+                <div class="value">${formatCurrency(totalInvoiceFee)}</div>
+            </div>
+            <div class="summary-box">
+                <div class="label">🎁 Chiết khấu</div>
+                <div class="value">${formatCurrency(totalInvoiceDiscount)}</div>
+            </div>
+            <div class="summary-box">
+                <div class="label">🧾 Tổng thanh toán</div>
+                <div class="value">${formatCurrency(totalInvoiceAmount)}</div>
+            </div>
         </div>
 
         <div class="tabs">
