@@ -8,35 +8,139 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      background-color: #2c3e50;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    header button {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 4px;
+      background-color: #3498db;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    header button:hover {
+      background-color: #2980b9;
+    }
+
+    .container {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      min-height: 0;
+    }
+
+    .sidebar {
+      width: 250px;
+      background-color: #34495e;
+      color: white;
+      padding: 15px;
+      overflow-y: auto;
+    }
+
+    .sidebar h3 {
+      margin-top: 0;
+    }
+
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .sidebar li {
+      padding: 10px;
+      cursor: pointer;
+      border-bottom: 1px solid #4a6278;
+    }
+
+    .sidebar li:hover, .sidebar li.active {
+      background-color: #4a6278;
+    }
+
+    .main {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    #mainContent {
+      background-color: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      min-height: 100%;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        order: 1;
+      }
+
+      .main {
+        order: 2;
+        padding: 10px;
+      }
+
+      header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+  </style>
 </head>
 <body>
   <!-- HEADER -->
-  <header class="header">
-    <input type="file" id="zipFile" accept=".zip" multiple hidden>
-    <div class="header-buttons">
-      <button onclick="document.getElementById('zipFile').click()">📁 Chọn file</button>
-      <button onclick="exportData()">📤 Xuất dữ liệu</button>
-      <button onclick="clearAll()">🗑️ Xoá toàn bộ</button>
-      <button onclick="undoAction()">🔁 Undo</button>
-      <button onclick="summarize()">📊 Tổng kết</button>
-      <button onclick="uploadToGitHub()">⬆️ Đẩy lên GitHub</button>
-      <button onclick="searchHKD()">🔍 Tìm kiếm</button>
-    </div>
+  <header>
+    <input type="file" id="zipFile" accept=".zip" multiple style="display: none;">
+    <button onclick="document.getElementById('zipFile').click()">📁 Chọn file</button>
+    <button onclick="exportData()">📤 Xuất dữ liệu</button>
+    <button onclick="clearAll()">🗑️ Xoá toàn bộ</button>
+    <button onclick="undoAction()">🔁 Undo</button>
+    <button onclick="summarize()">📊 Tổng kết</button>
+    <button onclick="uploadToGitHub()">⬆️ Đẩy lên GitHub</button>
+    <button onclick="searchHKD()">🔍 Tìm kiếm</button>
   </header>
 
   <div class="container">
     <!-- DANH SÁCH HKD -->
-    <aside class="sidebar" id="hkdList">
+    <div class="sidebar" id="hkdList">
       <h3>📋 Danh sách HKD</h3>
       <ul id="businessList"></ul>
-    </aside>
+    </div>
 
     <!-- NỘI DUNG CHÍNH -->
-    <main class="main">
-      <section id="mainContent">
+    <div class="main">
+      <div id="mainContent">
         <div id="hkdInfo">Chưa chọn HKD</div>
-      </section>
-    </main>
+      </div>
+    </div>
   </div>
 
   <script src="script.js"></script>
