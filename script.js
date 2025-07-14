@@ -178,91 +178,136 @@ async function extractInvoiceFromZip(zipFile) {
 
 // Parse XML with precise extraction
 function parseXmlInvoice(xmlContent) {
-  const xmlDoc = new DOMParser().parseFromString(xmlContent, 'application/xml');
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
 
-  const info = {
-    title: textOf('HDon > DLHDon > TTChung > THDon', null, xmlDoc),
-    template: textOf('HDon > DLHDon > TTChung > KHHDon', null, xmlDoc),
-    symbol: textOf('HDon > DLHDon > TTChung > KHMSHDon', null, xmlDoc),
-    number: textOf('HDon > DLHDon > TTChung > SHDon', null, xmlDoc),
-    date: textOf('HDon > DLHDon > TTChung > NLap', null, xmlDoc),
-    paymentMethod: textOf('HDon > DLHDon > TTChung > HTTToan', null, xmlDoc),
-    paymentStatus: (() => {
-      for (const n of xmlDoc.querySelectorAll('TTKhac > TTin')) {
-        if (textOf('TTruong', n, xmlDoc).includes('Trạng thái thanh toán'))
-          return textOf('DLieu', n, xmlDoc);
-      }
-      return '';
-    })(),
-    amountInWords: (() => {
-      for (const n of xmlDoc.querySelectorAll('TTKhac > TTin')) {
-        if (textOf('TTruong', n, xmlDoc).toLowerCase().includes('bằng chữ'))
-          return textOf('DLieu', n, xmlDoc);
-      }
-      return '';
-    })(),
-    totalAmountFromXml: textOf('HDon > DLHDon > NDHDon > TToan > TgTTTBSo', null, xmlDoc)
-  };
+    const getText = (path, parent = xmlDoc) => {
+        const node = parent.querySelector(path);
+        return node ? node.textContent.trim() : '';
+    };
 
-  const seller = {
-    name: textOf('HDon > DLHDon > NDHDon > NBan > Ten', null, xmlDoc),
-    taxCode: textOf('HDon > DLHDon > NDHDon > NBan > MST', null, xmlDoc),
-    address: textOf('HDon > DLHDon > NDHDon > NBan > DChi', null, xmlDoc)
-  };
+    const getAdditionalInfo = (fieldName) => {
+        const ttKhacNode = xmlDoc.querySelector('HDon > DLHDon > NDHDon > TToan > TTKhac');
+        if (ttKhacNode) {
+            const nodes = ttKhacNode.querySelectorAll('TTin');
+            for (const node of nodes) {
+                const field = node.querySelector('TTruong');
+                if (field && field.textContent.trim() === fieldName) {
+                    return node.querySelector('DLieu')?.textContent.trim() || '';
+                }
+            }
+        }
+        return '';
+    };
 
-  const buyer = {
-    name: textOf('HDon > DLHDon > NDHDon > NMua > Ten', null, xmlDoc),
-    taxCode: textOf('HDon > DLHDon > NDHDon > NMua > MST', null, xmlDoc),
-    address: textOf('HDon > DLHDon > NDHDon > NMua > DChi', null, xmlDoc)
-  };
+    const getXPathValue = (xpath) => {
+        try {
+            const result = xmlDoc.evaluate(xpath, xmlDoc, null, XPathResult.STRING_TYPE, null);
+            return result.stringValue ? result.stringValue.trim() : '';
+        } catch (e) {
+            logAction('xpath_error', { xpath, error: e.message });
+            return '';
+        }
+    };
 
-  const products = [];
-  let totalFromLines = 0;
+    const invoiceInfo = {
+        title: getText('HDon > DLHDon > TTChung > THDon'),
+        template: getText('HDon > DLHDon > TTChung > KHHDon'),
+        symbol: getText('HDon > DLHDon > TTChung > KHMSHDon'),
+        number: getText('HDon > DLHDon > TTChung > SHDon'),
+        date: getText('HDon > DLHDon > TTChung > NLap'),
+        paymentMethod: getText('HDon > DLHDon > TTChung > HTTToan'),
+        paymentStatus: getAdditionalInfo('Trạng thái thanh toán'),
+        amountInWords: getAdditionalInfo('TotalAmountInWordsByENG') || '',
+        mccqt: getText('HDon > MCCQT')?.trim().toUpperCase() || ''
+    };
 
-  xmlDoc.querySelectorAll('HDon > DLHDon > NDHDon > DSHHDVu > HHDVu').forEach(node => {
-    const quantity = parseFloat(textOf('SLuong', node, xmlDoc)) || 0;
-    const price = parseFloat(textOf('DGia', node, xmlDoc)) || 0;
-    const discount = parseFloat(textOf('STCKhau', node, xmlDoc)) || 0;
-    const lineAmount = parseFloat(textOf('ThTien', node, xmlDoc)) || (quantity * price - discount);
-    const tax = parseFloat(textOf('TThue', node, xmlDoc)) || 0;
-    const taxRateRaw = textOf('TSuat', node, xmlDoc) || '0';
+    const sellerInfo = {
+        name: getText('HDon > DLHDon > NDHDon > NBan > Ten'),
+        taxCode: getText('HDon > DLHDon > NDHDon > NBan > MST'),
+        address: getText('HDon > DLHDon > NDHDon > NBan > DChi'),
+        phone: getText('HDon > DLHDon > NDHDon > NBan > SDThoai'),
+        email: getText('HDon > DLHDon > NDHDon > NBan > DCTDTu')
+    };
 
-    let loai = 'hang_hoa';
-    const name = textOf('THHDVu', node, xmlDoc).toLowerCase();
-    if (!quantity && !price && !lineAmount) loai = 'tieu_de';
-    else if (discount > 0 || lineAmount < 0 || name.includes('chiết khấu')) loai = 'chiet_khau';
-    else if (price === 0 || name.includes('km') || name.includes('khuyến mại')) loai = 'khuyen_mai';
+    const buyerInfo = {
+        name: getText('HDon > DLHDon > NDHDon > NMua > Ten'),
+        taxCode: getText('HDon > DLHDon > NDHDon > NMua > MST'),
+        address: getText('HDon > DLHDon > NDHDon > NMua > DChi'),
+        customerCode: getText('HDon > DLHDon > NDHDon > NMua > MKHang'),
+        idNumber: getText('HDon > DLHDon > NDHDon > NMua > CCCDan')
+    };
 
-    totalFromLines += lineAmount + tax;
+    const products = [];
+    const productNodes = xmlDoc.querySelectorAll('HDon > DLHDon > NDHDon > DSHHDVu > HHDVu');
 
-    products.push({
-      loai,
-      stt: textOf('STT', node, xmlDoc),
-      code: textOf('MHHDVu', node, xmlDoc),
-      name: textOf('THHDVu', node, xmlDoc),
-      unit: textOf('DVTinh', node, xmlDoc),
-      quantity,
-      price,
-      discount,
-      amount: lineAmount.toFixed(2),
-      taxRate: taxRateRaw,
-      tax: tax.toFixed(2)
+    productNodes.forEach((node, index) => {
+        const quantity = parseFloat(getText('SLuong', node)) || parseFloat(getXPathValue('SLuong/text()', node)) || 0;
+        const price = parseFloat(getText('DGia', node)) || parseFloat(getXPathValue('DGia/text()', node)) || 0;
+        const taxRate = parseFloat(getText('TSuat', node)) || parseFloat(getXPathValue('TSuat/text()', node)) || 0;
+        const discount = parseFloat(getText('STCKhau', node)) || parseFloat(getXPathValue('STCKhau/text()', node)) || 0;
+        const name = getText('THHDVu', node) || getXPathValue('THHDVu/text()', node) || 'Không xác định';
+        const amount = (quantity * price - discount).toFixed(2);
+
+        let category = 'hang_hoa';
+        const nameLower = name.toLowerCase();
+        if (nameLower.includes('khuyến mại') || nameLower.includes('khuyến mãi') || nameLower.includes('tặng') || price === 0 || amount === 0) {
+            category = 'KM';
+        } else if (nameLower.includes('chiết khấu') || (discount > 0 && amount < quantity * price) || price === 0 || amount === 0) {
+            category = 'chiet_khau';
+        }
+
+        const product = {
+            stt: getText('STT', node) || (index + 1).toString(),
+            code: getText('MHHDVu', node) || `UNKNOWN_${index}`,
+            name: name,
+            unit: getText('DVTinh', node) || 'N/A',
+            quantity: quantity.toString(),
+            price: price.toString(),
+            discount: discount.toString(),
+            amount: amount,
+            taxRate: taxRate.toString(),
+            tax: (quantity * price * taxRate / 100).toFixed(2).toString(),
+            category
+        };
+        products.push(product);
     });
-  });
 
-  const totalDeclared = parseFloat(info.totalAmountFromXml || 0);
-  const roundedCalc = Math.round(totalFromLines);
-  const roundedDeclared = Math.round(totalDeclared);
-
-  if (Math.abs(roundedDeclared - roundedCalc) > 1) {
-    console.warn('⚠️ Chênh lệch tổng tiền:', {
-      từ_xml: totalDeclared,
-      từ_tính: totalFromLines.toFixed(2),
-      chênh_lệch: (totalFromLines - totalDeclared).toFixed(2)
+    logAction('parse_xml_products', {
+        productCount: products.length,
+        products: products.map(p => ({ code: p.code, name: p.name, quantity: p.quantity, category: p.category }))
     });
-  }
 
-  return { info, seller, buyer, products };
+    const totals = {
+        beforeTax: getAdditionalInfo('TotalAmountWithoutVAT') || (products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0).toString() : '0'),
+        tax: getAdditionalInfo('TotalVATAmount') || (products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.tax || '0'), 0).toString() : '0'),
+        fee: '0',
+        discount: getText('HDon > DLHDon > NDHDon > TToan > TTCKTMai') || getAdditionalInfo('TTCKTMai') || '0',
+        total: getAdditionalInfo('TotalAmount') || (parseFloat(getAdditionalInfo('TotalAmountWithoutVAT') || (products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0).toString() : '0')) + parseFloat(getAdditionalInfo('TotalVATAmount') || (products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.tax || '0'), 0).toString() : '0'))).toString() || '0'
+    };
+
+    logAction('parse_totals', {
+        beforeTax: totals.beforeTax,
+        tax: totals.tax,
+        fee: totals.fee,
+        discount: totals.discount,
+        total: totals.total,
+        amountInWords: invoiceInfo.amountInWords,
+        source: {
+            getAdditionalInfo: {
+                TotalAmountWithoutVAT: getAdditionalInfo('TotalAmountWithoutVAT'),
+                TotalVATAmount: getAdditionalInfo('TotalVATAmount'),
+                TotalAmount: getAdditionalInfo('TotalAmount'),
+                TotalAmountInWordsByENG: getAdditionalInfo('TotalAmountInWordsByENG')
+            },
+            calculated: {
+                beforeTaxFromProducts: products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0).toString() : '0',
+                taxFromProducts: products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.tax || '0'), 0).toString() : '0'
+            }
+        }
+    });
+
+    return { invoiceInfo, sellerInfo, buyerInfo, products, totals };
 }
 
 // Process invoice data and group by MST
