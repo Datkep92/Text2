@@ -7,35 +7,36 @@
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
   <!-- HEADER -->
-  <header>
-    <input type="file" id="zipFile" accept=".zip" multiple style="display: none;">
-    <button onclick="document.getElementById('zipFile').click()">📁 Chọn file</button>
-    <button onclick="exportData()">📤 Xuất dữ liệu</button>
-    <button onclick="clearAll()">🗑️ Xoá toàn bộ</button>
-    <button onclick="undoAction()">🔁 Undo</button>
-    <button onclick="summarize()">📊 Tổng kết</button>
-    <button onclick="uploadToGitHub()">⬆️ Đẩy lên GitHub</button>
-    <button onclick="searchHKD()">🔍 Tìm kiếm</button>
+  <header class="header">
+    <input type="file" id="zipFile" accept=".zip" multiple hidden>
+    <div class="header-buttons">
+      <button onclick="document.getElementById('zipFile').click()">📁 Chọn file</button>
+      <button onclick="exportData()">📤 Xuất dữ liệu</button>
+      <button onclick="clearAll()">🗑️ Xoá toàn bộ</button>
+      <button onclick="undoAction()">🔁 Undo</button>
+      <button onclick="summarize()">📊 Tổng kết</button>
+      <button onclick="uploadToGitHub()">⬆️ Đẩy lên GitHub</button>
+      <button onclick="searchHKD()">🔍 Tìm kiếm</button>
+    </div>
   </header>
 
   <div class="container">
     <!-- DANH SÁCH HKD -->
-    <div class="sidebar" id="hkdList">
+    <aside class="sidebar" id="hkdList">
       <h3>📋 Danh sách HKD</h3>
       <ul id="businessList"></ul>
-    </div>
+    </aside>
 
     <!-- NỘI DUNG CHÍNH -->
-    <div class="main">
-      <div id="mainContent">
+    <main class="main">
+      <section id="mainContent">
         <div id="hkdInfo">Chưa chọn HKD</div>
-      </div>
-    </div>
+      </section>
+    </main>
   </div>
 
   <script src="script.js"></script>
