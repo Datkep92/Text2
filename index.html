@@ -30,8 +30,7 @@
       gap: 10px;
     }
 
-    header button,
-    header label {
+    header button {
       padding: 8px 12px;
       border: none;
       border-radius: 4px;
@@ -42,12 +41,7 @@
       white-space: nowrap;
     }
 
-    header label input {
-      margin-right: 5px;
-    }
-
-    header button:hover,
-    header label:hover {
+    header button:hover {
       background-color: #2980b9;
     }
 
@@ -118,7 +112,6 @@
       }
     }
 
-    /* COMPACT MODE */
     .compact-mode .tonkho-table .col-maKH,
     .compact-mode .tonkho-table .col-phanloai,
     .compact-mode .hoadon-table .col-tontruoc,
@@ -135,25 +128,23 @@
 </head>
 <body>
   <header>
-    <input type="file" id="zipFile" accept=".zip" multiple style="display: none;">
     <button onclick="document.getElementById('zipFile').click()">📁 Chọn file</button>
+    <input type="file" id="zipFile" accept=".zip" multiple style="display: none;">
     <button onclick="exportData()">📤 Xuất dữ liệu</button>
     <button onclick="clearAll()">🗑️ Xoá toàn bộ</button>
     <button onclick="undoAction()">🔁 Undo</button>
     <button onclick="summarize()">📊 Tổng kết</button>
     <button onclick="uploadToGitHub()">⬆️ Đẩy lên GitHub</button>
     <button onclick="searchHKD()">🔍 Tìm kiếm</button>
-    <label><input type="checkbox" id="compactToggle" onchange="toggleCompact()"> 🧩 Tối giản</label>
+    <button onclick="toggleSidebarMobile()" class="mobile-only">☰ HKD</button>
   </header>
 
   <div class="container">
-    <!-- DANH SÁCH HKD -->
     <div class="sidebar" id="hkdList">
       <h3>📋 Danh sách HKD</h3>
       <ul id="businessList"></ul>
     </div>
 
-    <!-- NỘI DUNG CHÍNH -->
     <div class="main">
       <div id="mainContent">
         <div id="hkdInfo">Chưa chọn HKD</div>
@@ -162,8 +153,14 @@
   </div>
 
   <script>
-    function toggleCompact() {
-      document.body.classList.toggle('compact-mode');
+    // Tự động bật compact-mode nếu là mobile
+    if (window.innerWidth < 768) {
+      document.body.classList.add('compact-mode');
+    }
+
+    // Toggle sidebar mobile
+    function toggleSidebarMobile() {
+      document.getElementById('hkdList').classList.toggle('show');
     }
   </script>
   <script src="script.js"></script>
