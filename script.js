@@ -200,16 +200,6 @@ function parseXmlInvoice(xmlContent) {
         return '';
     };
 
-    const getXPathValue = (xpath) => {
-        try {
-            const result = xmlDoc.evaluate(xpath, xmlDoc, null, XPathResult.STRING_TYPE, null);
-            return result.stringValue ? result.stringValue.trim() : '';
-        } catch (e) {
-            logAction('xpath_error', { xpath, error: e.message });
-            return '';
-        }
-    };
-
     const invoiceInfo = {
         title: getText('HDon > DLHDon > TTChung > THDon'),
         template: getText('HDon > DLHDon > TTChung > KHHDon'),
@@ -242,73 +232,51 @@ function parseXmlInvoice(xmlContent) {
     const productNodes = xmlDoc.querySelectorAll('HDon > DLHDon > NDHDon > DSHHDVu > HHDVu');
 
     productNodes.forEach((node, index) => {
-        const quantity = parseFloat(getText('SLuong', node)) || parseFloat(getXPathValue('SLuong/text()', node)) || 0;
-        const price = parseFloat(getText('DGia', node)) || parseFloat(getXPathValue('DGia/text()', node)) || 0;
-        const taxRate = parseFloat(getText('TSuat', node)) || parseFloat(getXPathValue('TSuat/text()', node)) || 0;
-        const discount = parseFloat(getText('STCKhau', node)) || parseFloat(getXPathValue('STCKhau/text()', node)) || 0;
-        const name = getText('THHDVu', node) || getXPathValue('THHDVu/text()', node) || 'Không xác định';
-        const amount = (quantity * price - discount).toFixed(2);
+        const quantity = parseFloat(getText('SLuong', node)) || 0;
+        const price = parseFloat(getText('DGia', node)) || 0;
+        const taxRate = parseFloat(getText('TSuat', node)) || 0;
+        const discount = parseFloat(getText('STCKhau', node)) || 0;
+        const name = getText('THHDVu', node) || 'Không xác định';
+
+        const amount = Math.round(quantity * price - discount);
+        const tax = Math.round(quantity * price * taxRate / 100);
+
 
         let category = 'hang_hoa';
         const nameLower = name.toLowerCase();
-        if (nameLower.includes('khuyến mại') || nameLower.includes('khuyến mãi') || nameLower.includes('tặng') || price === 0 || amount === 0) {
+        if (nameLower.includes('khuyến mại') || nameLower.includes('tặng') || price === 0 || amount === 0) {
             category = 'KM';
-        } else if (nameLower.includes('chiết khấu') || (discount > 0 && amount < quantity * price) || price === 0 || amount === 0) {
+        } else if (nameLower.includes('chiết khấu') || (discount > 0 && amount < quantity * price)) {
             category = 'chiet_khau';
         }
 
-        const product = {
+        products.push({
             stt: getText('STT', node) || (index + 1).toString(),
             code: getText('MHHDVu', node) || `UNKNOWN_${index}`,
-            name: name,
+            name,
             unit: getText('DVTinh', node) || 'N/A',
             quantity: quantity.toString(),
             price: price.toString(),
             discount: discount.toString(),
-            amount: amount,
+            amount: amount.toString(),
             taxRate: taxRate.toString(),
-            tax: (quantity * price * taxRate / 100).toFixed(2).toString(),
+            tax: tax.toString(),
             category
-        };
-        products.push(product);
-    });
+        });
 
-    logAction('parse_xml_products', {
-        productCount: products.length,
-        products: products.map(p => ({ code: p.code, name: p.name, quantity: p.quantity, category: p.category }))
     });
 
     const totals = {
-        beforeTax: getAdditionalInfo('TotalAmountWithoutVAT') || (products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0).toString() : '0'),
-        tax: getAdditionalInfo('TotalVATAmount') || (products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.tax || '0'), 0).toString() : '0'),
+        beforeTax: getAdditionalInfo('TotalAmountWithoutVAT') || products.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0).toFixed(2),
+        tax: getAdditionalInfo('TotalVATAmount') || products.reduce((sum, p) => sum + parseFloat(p.tax || '0'), 0).toFixed(2),
         fee: '0',
         discount: getText('HDon > DLHDon > NDHDon > TToan > TTCKTMai') || getAdditionalInfo('TTCKTMai') || '0',
-        total: getAdditionalInfo('TotalAmount') || (parseFloat(getAdditionalInfo('TotalAmountWithoutVAT') || (products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0).toString() : '0')) + parseFloat(getAdditionalInfo('TotalVATAmount') || (products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.tax || '0'), 0).toString() : '0'))).toString() || '0'
+        total: getText('HDon > DLHDon > NDHDon > TToan > TgTTTBSo') || '0' // ✅ chính xác theo thẻ
     };
-
-    logAction('parse_totals', {
-        beforeTax: totals.beforeTax,
-        tax: totals.tax,
-        fee: totals.fee,
-        discount: totals.discount,
-        total: totals.total,
-        amountInWords: invoiceInfo.amountInWords,
-        source: {
-            getAdditionalInfo: {
-                TotalAmountWithoutVAT: getAdditionalInfo('TotalAmountWithoutVAT'),
-                TotalVATAmount: getAdditionalInfo('TotalVATAmount'),
-                TotalAmount: getAdditionalInfo('TotalAmount'),
-                TotalAmountInWordsByENG: getAdditionalInfo('TotalAmountInWordsByENG')
-            },
-            calculated: {
-                beforeTaxFromProducts: products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0).toString() : '0',
-                taxFromProducts: products.length > 0 ? products.reduce((sum, p) => sum + parseFloat(p.tax || '0'), 0).toString() : '0'
-            }
-        }
-    });
 
     return { invoiceInfo, sellerInfo, buyerInfo, products, totals };
 }
+
 
 // Process invoice data and group by MST
 // REPLACE with:
@@ -537,250 +505,6 @@ function updateBusinessList() {
         showBusinessDetails(firstTaxCode);
         businessList.querySelector(`li[data-tax-code="${firstTaxCode}"]`).classList.add('active');
     }
-}
-
-// Display HKD content
-function showBusinessDetails(taxCode) {
-    const hkd = hkdData[taxCode];
-    if (!hkd) {
-        logAction('error', { message: `Không tìm thấy HKD với ID: ${taxCode}` });
-        showToast('Lỗi: Không tìm thấy doanh nghiệp', 'error');
-        mainContent.innerHTML = '<div id="hkdInfo">Chưa chọn HKD</div>';
-        return;
-    }
-
-    hkd.invoices = hkd.invoices || [];
-    hkd.deleteHistory = hkd.deleteHistory || [];
-    hkd.exportHistory = hkd.exportHistory || [];
-    hkd.inventory = hkd.inventory || [];
-
-    let totalQuantity = 0;
-    let totalAmount = 0;
-    let totalSellingAmount = 0;
-    let totalTax = 0;
-    let totalInvoiceBeforeTax = 0;
-    let totalInvoiceTax = 0;
-    let totalInvoiceFee = 0;
-    let totalInvoiceDiscount = 0;
-    let totalInvoiceAmount = 0;
-
-    hkd.invoices.forEach(inv => {
-        totalInvoiceBeforeTax += parseFloat(inv.totals?.beforeTax || '0');
-        totalInvoiceTax += parseFloat(inv.totals?.tax || '0');
-        totalInvoiceFee += parseFloat(inv.totals?.fee || '0');
-        totalInvoiceDiscount += parseFloat(inv.totals?.discount || '0');
-        totalInvoiceAmount += parseFloat(inv.totals?.total || '0');
-    });
-
-    hkd.inventory.forEach(item => {
-        totalQuantity += parseFloat(item.quantity) || 0;
-        totalAmount += parseFloat(item.amount) || 0;
-        totalSellingAmount += (parseFloat(item.sellingPrice) * parseFloat(item.quantity)) || 0;
-        totalTax += parseFloat(item.tax) || 0;
-    });
-
-    mainContent.innerHTML = `
-        <div class="hkd-summary-grid">
-<div class="hkd-report-filters">
-  <label>Từ ngày: <input type="date" id="reportFrom-${taxCode}"></label>
-  <label>Đến ngày: <input type="date" id="reportTo-${taxCode}"></label>
-  <button onclick="applyHKDReportFilter('${taxCode}')">📊 Áp dụng</button>
-  <button onclick="printHKDSummary('${taxCode}')">🖨️ In báo cáo</button>
-</div>
- <div class="summary-box full-row">
-    <div class="label">🧾 <b>CHI TIẾT HKD/ DOANH NGHIỆP</b></div>
-  </div>
-<div id="filteredSummary-${taxCode}"></div>
-
-            <div class="hkd-summary-grid">
-  <div class="summary-box">
-    <div class="label">📦 Tổng số lượng</div>
-    <div class="value" id="${taxCode}-summary-totalQuantity">${formatNumber(totalQuantity)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">💼 Tổng tồn kho (giá gốc)</div>
-    <div class="value" id="${taxCode}-summary-totalAmount">${formatCurrency(totalAmount)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">💰 Tổng giá bán</div>
-    <div class="value" id="${taxCode}-summary-totalSelling">${formatCurrency(totalSellingAmount)}</div>
-  </div>
-<div class="summary-box">
-    <div class="label">🧾 Tổng Hóa Đơn</div>
-    <div class="value" id="${taxCode}-summary-total">${formatCurrency(totalInvoiceAmount)}</div>
-  </div>
-  <div class="summary-box">
-    <div class="label">💵 HĐ Chưa thuế</div>
-    <div class="value" id="${taxCode}-summary-beforeTax">${formatCurrency(totalInvoiceBeforeTax)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">💸 Thuế GTGT</div>
-    <div class="value" id="${taxCode}-summary-tax">${formatCurrency(totalInvoiceTax)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">📦 Phí</div>
-    <div class="value" id="${taxCode}-summary-fee">${formatCurrency(totalInvoiceFee)}</div>
-  </div>
-
-  <div class="summary-box">
-    <div class="label">🎁 Chiết khấu</div>
-    <div class="value" id="${taxCode}-summary-discount">${formatCurrency(totalInvoiceDiscount)}</div>
-  </div>
-
-  
-
-
-        </div>
-
-        <div class="tabs">
-            <div class="tab active" onclick="openTab(event, '${taxCode}-tonkho')">📦 Tồn kho</div>
-            <div class="tab" onclick="openTab(event, '${taxCode}-qlyhoadon')">📥 Quản lý Hóa đơn đầu vào</div>
-            <div class="tab" onclick="openTab(event, '${taxCode}-xuathang')">📤 Xuất hàng hóa</div>
-            <div class="tab" onclick="openTab(event, '${taxCode}-lichsu')">📜 Lịch sử xuất hàng</div>
-            <div class="tab" onclick="openTab(event, '${taxCode}-xoaHKD')">🗑️ Lịch sử xóa HKD</div>
-        </div>
-
-        <div id="${taxCode}-tonkho" class="tab-content active">
-            <h4>📦 Danh sách tồn kho</h4>
-            <select onchange="productAction(this, '${taxCode}')">
-                <option value="">Chọn hành động</option>
-                <option value="add">Thêm sản phẩm</option>
-            </select>
-            ${hkd.inventory.length === 0 ? '<p>Chưa có hàng hóa trong tồn kho</p>' :
-            `<table>
-                <thead>
-                    <tr>
-                        <th>STT</th>
-                        <th>Tên hàng</th>
-                        <th>Mã</th>
-                        <th>Phân loại</th>
-                        <th>ĐVT</th>
-                        <th>Số lượng</th>
-                        <th>Đơn giá</th>
-                        <th>Giá bán</th>
-                        <th>Thành tiền</th>
-                        <th>Thuế suất</th>
-                        <th>Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${hkd.inventory
-  .filter(item => parseFloat(item.quantity) > 0) // ❗ Lọc sản phẩm có tồn kho > 0
-  .sort((a, b) => {
-      const order = { 'hang_hoa': 1, 'KM': 2, 'chiet_khau': 3 };
-      return order[a.category] - order[b.category];
-  })
-  .map((item, index) => `
-      <tr>
-          <td>${index + 1}</td>
-          <td>${item.name || 'Không xác định'}</td>
-          <td>${item.code || 'N/A'}</td>
-          <td>${item.category || 'hang_hoa'}</td>
-          <td>${item.unit || 'N/A'}</td>
-          <td class="text-right">${formatNumber(item.quantity)}</td>
-          <td class="text-right">${formatCurrency(item.price)}</td>
-          <td class="text-right">${formatCurrency(item.sellingPrice)}</td>
-          <td class="text-right">${formatCurrency(item.amount)}</td>
-          <td class="text-right">${item.taxRate}%</td>
-          <td>
-              <select onchange="productAction(this, '${taxCode}', '${item.code}', '${item.unit}')">
-                  <option value="">Chọn</option>
-                  <option value="edit">Sửa</option>
-                  <option value="delete">Xóa</option>
-              </select>
-          </td>
-      </tr>
-  `).join('')}
-
-                    <tr class="total-row">
-                        <td colspan="5">Tổng cộng</td>
-                        <td class="text-right">${formatNumber(totalQuantity)}</td>
-                        <td></td>
-                        <td></td>
-                        <td class="text-right">${formatCurrency(totalAmount)}</td>
-                        <td></td>
-                        <td class="text-right">${formatCurrency(totalTax)}</td>
-                    </tr>
-                </tbody>
-            </table>`}
-        </div>
-
-        <div id="${taxCode}-qlyhoadon" class="tab-content">
-            <h4>📥 Quản lý Hóa đơn đầu vào</h4>
-            <div id="${taxCode}-invoiceTablePlaceholder"></div>
-        </div>
-
-        <div id="${taxCode}-hoadon" class="tab-content">
-            <h4>🧾 Danh sách hóa đơn</h4>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Số hóa đơn</th>
-                        <th>Ngày lập</th>
-                        <th>Mẫu số</th>
-                        <th>Tổng tiền</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${hkd.invoices.map(invoice => `
-                        <tr>
-                            <td>${invoice.invoiceInfo.number || 'N/A'}</td>
-                            <td>${invoice.invoiceInfo.date || 'N/A'}</td>
-                            <td>${invoice.invoiceInfo.template || 'N/A'}</td>
-                            <td class="text-right">${formatCurrency(invoice.totals.total)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
-
-        <div id="${taxCode}-xuathang" class="tab-content">
-            <div id="${taxCode}-exportTabPlaceholder"></div>
-        </div>
-
-        <div id="${taxCode}-lichsu" class="tab-content">
-            <h4>📜 Lịch sử xuất hàng</h4>
-            <div id="${taxCode}-exportHistoryTable"></div>
-        </div>
-
-        <div id="${taxCode}-xoaHKD" class="tab-content">
-            <h4>🗑️ Lịch sử xóa HKD</h4>
-            ${hkd.deleteHistory.length === 0 ?
-            '<p>Chưa có dữ liệu xóa HKD</p>' :
-            `<table>
-                <thead>
-                    <tr>
-                        <th>Thời gian</th>
-                        <th>MST</th>
-                        <th>Tên HKD</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${hkd.deleteHistory.map(entry => `
-                        <tr>
-                            <td>${new Date(entry.timestamp).toLocaleString('vi-VN')}</td>
-                            <td>${entry.taxCode}</td>
-                            <td>${entry.name}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>`}
-        </div>
-    `;
-
-     // 👉 Gọi các phần động sau khi innerHTML đã gán xong
-    const invoiceTable = document.getElementById(`${taxCode}-invoiceTablePlaceholder`);
-    if (invoiceTable) invoiceTable.innerHTML = renderInvoiceManagementTable(hkd);
-
-    const exportTab = document.getElementById(`${taxCode}-exportTabPlaceholder`);
-    if (exportTab) exportTab.innerHTML = renderExportTab(hkd, taxCode);
-
-    const exportHistoryTable = document.getElementById(`${taxCode}-exportHistoryTable`);
-    if (exportHistoryTable) exportHistoryTable.innerHTML = renderExportHistory(taxCode);
 }
 
 
@@ -1376,11 +1100,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 function generateRandomExport(taxCode) {
-const buyerInfo = {
-    buyer: randomCustomerName(),
-    address: randomAddressNinhThuan(),
-    requestedAmount: amount
-};
+    const buyerInfo = {
+        buyer: randomCustomerName(),
+        address: randomAddressNinhThuan(),
+        requestedAmount: amount
+    };
     const input = document.getElementById(`exportAmount-${taxCode}`);
     const amount = parseFloat(input.value.replace(/[^\d.-]/g, ''));
     if (isNaN(amount) || amount <= 0) {
@@ -1459,7 +1183,7 @@ function randomCustomerName() {
     return names[Math.floor(Math.random() * names.length)];
 }
 function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0;
         const v = (c === 'x') ? r : (r & 0x3 | 0x8);
         return v.toString(16);
@@ -1488,15 +1212,15 @@ function confirmExport(taxCode, buyerInfo, productList, mode) {
         showToast("❌ Chưa chọn hàng hóa để xuất", "error");
         return;
     }
-const invalidItem = productList.find(p => {
-    const inv = hkdData[taxCode].inventory.find(i => i.code === p.code);
-    return !inv || inv.quantity < p.quantity;
-});
+    const invalidItem = productList.find(p => {
+        const inv = hkdData[taxCode].inventory.find(i => i.code === p.code);
+        return !inv || inv.quantity < p.quantity;
+    });
 
-if (invalidItem) {
-    showToast(`❌ Sản phẩm "${invalidItem.name}" không đủ tồn kho để xuất`, "error");
-    return;
-}
+    if (invalidItem) {
+        showToast(`❌ Sản phẩm "${invalidItem.name}" không đủ tồn kho để xuất`, "error");
+        return;
+    }
 
     const total = productList.reduce((sum, p) => sum + (p.quantity * p.sellingPrice), 0);
     if (total <= 0) {
@@ -1645,19 +1369,20 @@ function getRandomAddress() {
 ///
 
 
-const buyer = getBuyerInfo(record.mode || 'manual');
 
 const exportRecord = {
-  buyerName: buyer.name,
-  buyerAddress: buyer.address,
-  buyerPhone: buyer.phone || '',
-  buyerTaxCode: buyer.taxCode || '',
-  mode, // 'manual' | 'semi' | 'auto'
-  items: selectedItems, // từ popup thủ công, random bán tự động hoặc tự động
-  totalAmount: calculateTotalAmount(selectedItems)
+    buyerName: buyer.name,
+    buyerAddress: buyer.address,
+    buyerPhone: buyer.phone || '',
+    buyerTaxCode: buyer.taxCode || '',
+    mode, // 'manual' | 'semi' | 'auto'
+    items: selectedItems, // từ popup thủ công, random bán tự động hoặc tự động
+    totalAmount: calculateTotalAmount(selectedItems)
 };
 
 function downloadExportExcel(taxCode, record) {
+    const buyer = getBuyerInfo(record.mode || 'manual');
+
     const items = record.items;
     if (!record || !items || items.length === 0) {
         showToast('❌ Không có dữ liệu để xuất Excel', 'error');
@@ -1665,13 +1390,13 @@ function downloadExportExcel(taxCode, record) {
     }
 
     const headers = [
-        'STT','NgayHoaDon','MaKhachHang','TenKhachHang','TenNguoiMua','MaSoThue','DiaChiKhachHang','DienThoaiKhachHang',
-        'SoTaiKhoan','NganHang','HinhThucTT','MaSanPham','SanPham','DonViTinh','Extra1SP','Extra2SP',
-        'SoLuong','DonGia','TyLeChietKhau','SoTienChietKhau','ThanhTien','TienBan','ThueSuat',
-        'TienThueSanPham','TienThue','TongSoTienChietKhau','TongCong','TinhChatHangHoa','DonViTienTe','TyGia',
-        'Fkey','Extra1','Extra2','EmailKhachHang','VungDuLieu','Extra3','Extra4','Extra5','Extra6','Extra7',
-        'Extra8','Extra9','Extra10','Extra11','Extra12','LDDNBo','HDSo','HVTNXHang','TNVChuyen','PTVChuyen',
-        'HDKTNgay','HDKTSo','CCCDan','','','mau_01'
+        'STT', 'NgayHoaDon', 'MaKhachHang', 'TenKhachHang', 'TenNguoiMua', 'MaSoThue', 'DiaChiKhachHang', 'DienThoaiKhachHang',
+        'SoTaiKhoan', 'NganHang', 'HinhThucTT', 'MaSanPham', 'SanPham', 'DonViTinh', 'Extra1SP', 'Extra2SP',
+        'SoLuong', 'DonGia', 'TyLeChietKhau', 'SoTienChietKhau', 'ThanhTien', 'TienBan', 'ThueSuat',
+        'TienThueSanPham', 'TienThue', 'TongSoTienChietKhau', 'TongCong', 'TinhChatHangHoa', 'DonViTienTe', 'TyGia',
+        'Fkey', 'Extra1', 'Extra2', 'EmailKhachHang', 'VungDuLieu', 'Extra3', 'Extra4', 'Extra5', 'Extra6', 'Extra7',
+        'Extra8', 'Extra9', 'Extra10', 'Extra11', 'Extra12', 'LDDNBo', 'HDSo', 'HVTNXHang', 'TNVChuyen', 'PTVChuyen',
+        'HDKTNgay', 'HDKTSo', 'CCCDan', '', '', 'mau_01'
     ];
 
     const today = new Date();
@@ -1750,18 +1475,18 @@ function downloadExportExcel(taxCode, record) {
     });
 
     // Trừ tồn kho và cập nhật lại thành tiền tồn kho
-record.items.forEach(item => {
-    const exist = hkd.inventory.find(i => i.code === item.code);
-    if (exist) {
-        exist.quantity -= item.quantity;
+    record.items.forEach(item => {
+        const exist = hkd.inventory.find(i => i.code === item.code);
+        if (exist) {
+            exist.quantity -= item.quantity;
 
-        if (exist.quantity <= 0) {
-            hkd.inventory = hkd.inventory.filter(i => i.code !== item.code); // Xóa luôn nếu hết hàng
-        } else {
-            exist.amount = exist.quantity * parseFloat(exist.price || 0); // ✅ Cập nhật lại số tiền tồn kho
+            if (exist.quantity <= 0) {
+                hkd.inventory = hkd.inventory.filter(i => i.code !== item.code); // Xóa luôn nếu hết hàng
+            } else {
+                exist.amount = exist.quantity * parseFloat(exist.price || 0); // ✅ Cập nhật lại số tiền tồn kho
+            }
         }
-    }
-});
+    });
 
 
     saveData();
@@ -1833,8 +1558,39 @@ function printExportInvoice(taxCode) {
     win.document.close();
     win.print();
 }
+function downloadInventoryExcel(taxCode) {
+    const hkd = hkdData[taxCode];
+    if (!hkd || !hkd.inventory || hkd.inventory.length === 0) {
+        showToast('❌ Không có dữ liệu tồn kho để xuất Excel', 'error');
+        return;
+    }
 
-//Báo cáo HKD
+    const headers = ['STT', 'Tên hàng', 'Mã', 'Phân loại', 'Đơn vị tính', 'Số lượng', 'Đơn giá', 'Giá bán', 'Thành tiền', 'Thuế suất'];
+    const rows = [headers];
+
+    hkd.inventory.forEach((item, index) => {
+        if (parseFloat(item.quantity || 0) > 0) {
+            rows.push([
+                index + 1,
+                item.name || '',
+                item.code || '',
+                item.category || '',
+                item.unit || '',
+                parseFloat(item.quantity || 0),
+                parseFloat(item.price || 0),
+                parseFloat(item.sellingPrice || 0),
+                parseFloat(item.amount || 0),
+                item.taxRate ? `${item.taxRate}%` : '0%'
+            ]);
+        }
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'TonKho');
+    XLSX.writeFile(wb, `TonKho_${taxCode}_${Date.now()}.xlsx`);
+}
+
 function applyHKDReportFilter(taxCode) {
     const from = document.getElementById(`reportFrom-${taxCode}`).value;
     const to = document.getElementById(`reportTo-${taxCode}`).value;
@@ -1850,15 +1606,6 @@ function applyHKDReportFilter(taxCode) {
         const d = new Date(inv.invoiceInfo.date);
         return (!fromDate || d >= fromDate) && (!toDate || d <= toDate);
     });
-// ✅ Cập nhật tiêu đề theo khoảng thời gian lọc
-let title = '🧾 <b>TỔNG TIỀN IN TRÊN HÓA ĐƠN</b>';
-if (from || to) {
-    const fromStr = from ? new Date(from).toLocaleDateString('vi-VN') : '...';
-    const toStr = to ? new Date(to).toLocaleDateString('vi-VN') : '...';
-    title += ` <span style="font-weight:normal">(${fromStr} - ${toStr})</span>`;
-}
-const titleEl = document.getElementById(`${taxCode}-summary-title`);
-if (titleEl) titleEl.innerHTML = title;
 
     // Tính toán
     let beforeTax = 0, tax = 0, fee = 0, discount = 0, total = 0;
@@ -1870,12 +1617,235 @@ if (titleEl) titleEl.innerHTML = title;
         total += parseFloat(inv.totals.total || 0);
     });
 
-    // Cập nhật DOM các số liệu trong bảng
-    document.getElementById(`${taxCode}-summary-beforeTax`).innerText = formatCurrency(beforeTax);
-    document.getElementById(`${taxCode}-summary-tax`).innerText = formatCurrency(tax);
-    document.getElementById(`${taxCode}-summary-fee`).innerText = formatCurrency(fee);
-    document.getElementById(`${taxCode}-summary-discount`).innerText = formatCurrency(discount);
-    document.getElementById(`${taxCode}-summary-total`).innerText = formatCurrency(total);
+    // Hiển thị báo cáo vào khu vực filteredSummary
+    const summaryDiv = document.getElementById(`filteredSummary-${taxCode}`);
+    if (summaryDiv) {
+        const fromStr = from ? new Date(from).toLocaleDateString('vi-VN') : '...';
+        const toStr = to ? new Date(to).toLocaleDateString('vi-VN') : '...';
+
+        summaryDiv.innerHTML = `
+            <div class="summary-box full-row" style="margin-top:10px; background:#f9f9f9; border:1px solid #ccc;">
+                <div class="label" style="font-size:16px;"><b>📊 TỔNG KẾT HÓA ĐƠN TỪ ${fromStr} → ${toStr}</b></div>
+                <div class="value">
+                    💵 Chưa thuế: <b>${formatCurrency(beforeTax)}</b> |
+                    💸 Thuế: <b>${formatCurrency(tax)}</b> |
+                    📦 Phí: <b>${formatCurrency(fee)}</b> |
+                    🎁 Chiết khấu: <b>${formatCurrency(discount)}</b> |
+                    🧾 Tổng thanh toán: <b>${formatCurrency(total)}</b>
+                </div>
+            </div>
+        `;
+    } else {
+        console.warn(`Không tìm thấy phần tử filteredSummary-${taxCode}`);
+    }
+}
+
+function showBusinessDetails(taxCode) {
+    const hkd = hkdData[taxCode];
+    if (!hkd) {
+        logAction('error', { message: `Không tìm thấy HKD với ID: ${taxCode}` });
+        showToast('Lỗi: Không tìm thấy doanh nghiệp', 'error');
+        mainContent.innerHTML = '<div id="hkdInfo">Chưa chọn HKD</div>';
+        return;
+    }
+
+    hkd.invoices = hkd.invoices || [];
+    hkd.deleteHistory = hkd.deleteHistory || [];
+    hkd.exportHistory = hkd.exportHistory || [];
+    hkd.inventory = hkd.inventory || [];
+
+    let totalQuantity = 0;
+    let totalAmount = 0;
+    let totalSellingAmount = 0;
+    let totalTax = 0;
+    let totalInvoiceBeforeTax = 0;
+    let totalInvoiceTax = 0;
+    let totalInvoiceFee = 0;
+    let totalInvoiceDiscount = 0;
+    let totalInvoiceAmount = 0;
+
+    hkd.invoices.forEach(inv => {
+        totalInvoiceBeforeTax += parseFloat(inv.totals?.beforeTax || '0');
+        totalInvoiceTax += parseFloat(inv.totals?.tax || '0');
+        totalInvoiceFee += parseFloat(inv.totals?.fee || '0');
+        totalInvoiceDiscount += parseFloat(inv.totals?.discount || '0');
+        totalInvoiceAmount += parseFloat(inv.totals?.total || '0');
+    });
+
+    hkd.inventory.forEach(item => {
+        totalQuantity += parseFloat(item.quantity) || 0;
+        totalAmount += parseFloat(item.amount) || 0;
+        totalSellingAmount += (parseFloat(item.sellingPrice) * parseFloat(item.quantity)) || 0;
+        totalTax += parseFloat(item.tax) || 0;
+    });
+
+    let totalExportRevenue = 0;
+    let totalExportCost = 0;
+
+    hkd.exportHistory.forEach(r => {
+        r.productList.forEach(p => {
+            const cost = parseFloat(p.price || 0);
+            const sell = parseFloat(p.sellingPrice || 0);
+            const qty = parseFloat(p.quantity || 0);
+            totalExportRevenue += sell * qty;
+            totalExportCost += cost * qty;
+        });
+    });
+
+    const totalProfit = totalExportRevenue - totalExportCost;
+
+    mainContent.innerHTML = `
+<div class="hkd-summary-grid">
+  <div class="hkd-report-filters">
+    <label>Từ ngày: <input type="date" id="reportFrom-${taxCode}"></label>
+    <label>Đến ngày: <input type="date" id="reportTo-${taxCode}"></label>
+    <button onclick="applyHKDReportFilter('${taxCode}')">📊 Áp dụng</button>
+    <button onclick="printHKDSummary('${taxCode}')">🖨️ In báo cáo</button>
+  </div>
+
+  <div id="filteredSummary-${taxCode}" style="margin-bottom:10px;"></div>
+
+  <div class="label" style="font-size: 25px; font-weight: bold; color: red; padding: 10px 0;">
+    🧾 <b></b> ${hkd.name || 'Chưa rõ tên'}
+  </div>
+
+  <div class="summary-box"><div class="label">📥 Tổng HĐ đầu vào</div>
+    <div class="value" id="${taxCode}-invoice-count">${hkd.invoices.length}</div>
+  </div>
+
+  <div class="summary-box"><div class="label">🧾 Tổng HDST đã T.Toán</div>
+    <div class="value" id="${taxCode}-summary-total">${formatCurrency(totalInvoiceAmount)}</div>
+  </div>
+
+  <div class="summary-box"><div class="label">💸 Thuế GTGT đã trả</div>
+    <div class="value" id="${taxCode}-summary-tax">${formatCurrency(totalInvoiceTax)}</div>
+  </div>
+
+  <div class="summary-box"><div class="label">📦 Phí</div>
+    <div class="value" id="${taxCode}-summary-fee">${formatCurrency(totalInvoiceFee)}</div>
+  </div>
+
+  <div class="summary-box"><div class="label">🎁 Chiết khấu</div>
+    <div class="value" id="${taxCode}-summary-discount">${formatCurrency(totalInvoiceDiscount)}</div>
+  </div>
+
+  <div class="summary-box"><div class="label">📤 Tổng HĐ xuất hàng</div>
+    <div class="value" id="${taxCode}-export-count">${hkd.exportHistory.length}</div>
+  </div>
+
+  <div class="summary-box"><div class="label">📤 Tổng tiền xuất hàng</div>
+    <div class="value" id="${taxCode}-export-amount">${formatCurrency(totalExportRevenue)}</div>
+  </div>
+
+  <div class="summary-box"><div class="label">📈 Tổng lợi nhuận tạm tính</div>
+    <div class="value" id="${taxCode}-export-profit">${formatCurrency(totalProfit)}</div>
+  </div>
+
+  <div class="summary-box"><div class="label">💼 Tổng tồn kho hiện tại (Chưa thuế)</div>
+    <div class="value" id="${taxCode}-summary-totalAmount">${formatCurrency(totalAmount)}</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="openTab(event, '${taxCode}-tonkho')">📦 Tồn kho</div>
+  <div class="tab" onclick="openTab(event, '${taxCode}-qlyhoadon')">📥 Quản lý Hóa đơn đầu vào</div>
+  <div class="tab" onclick="openTab(event, '${taxCode}-xuathang')">📤 Xuất hàng hóa</div>
+  <div class="tab" onclick="openTab(event, '${taxCode}-lichsu')">📜 Lịch sử xuất hàng</div>
+  <div class="tab" onclick="openTab(event, '${taxCode}-xoaHKD')">🗑️ Lịch sử xóa HKD</div>
+</div>
+
+<div id="${taxCode}-tonkho" class="tab-content active">
+  <h4>📦 Danh sách tồn kho</h4>
+  <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+    <select onchange="productAction(this, '${taxCode}')">
+      <option value="">Chọn hành động</option>
+      <option value="add">Thêm sản phẩm</option>
+    </select>
+    <button onclick="downloadInventoryExcel('${taxCode}')">📥 Xuất Excel tồn kho</button>
+  </div>
+
+  </select>
+  ${hkd.inventory.length === 0 ? '<p>Chưa có hàng hóa trong tồn kho</p>' :
+            `<table>
+  <thead>
+    <tr>
+      <th>STT</th>
+      <th>Tên hàng</th>
+      <th>Mã</th>
+      <th>Phân loại</th>
+      <th>ĐVT</th>
+      <th>Số lượng</th>
+      <th>Đơn giá</th>
+      <th>Giá bán</th>
+      <th>Thành tiền</th>
+      <th>Thuế suất</th>
+      <th>Hành động</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${hkd.inventory
+                .filter(item => parseFloat(item.quantity) > 0)
+                .sort((a, b) => {
+                    const order = { 'hang_hoa': 1, 'KM': 2, 'chiet_khau': 3 };
+                    return order[a.category] - order[b.category];
+                })
+                .map((item, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${item.name || 'Không xác định'}</td>
+        <td>${item.code || 'N/A'}</td>
+        <td>${item.category || 'hang_hoa'}</td>
+        <td>${item.unit || 'N/A'}</td>
+        <td class="text-right">${formatNumber(item.quantity)}</td>
+        <td class="text-right">${formatCurrency(item.price)}</td>
+        <td class="text-right">${formatCurrency(item.sellingPrice)}</td>
+        <td class="text-right">${formatCurrency(item.amount)}</td>
+        <td class="text-right">${item.taxRate}%</td>
+        <td>
+          <select onchange="productAction(this, '${taxCode}', '${item.code}', '${item.unit}')">
+            <option value="">Chọn</option>
+            <option value="edit">Sửa</option>
+            <option value="delete">Xóa</option>
+          </select>
+        </td>
+      </tr>`).join('')}
+    <tr class="total-row">
+      <td colspan="5">Tổng cộng</td>
+      <td class="text-right">${formatNumber(totalQuantity)}</td>
+      <td></td>
+      <td></td>
+      <td class="text-right">${formatCurrency(totalAmount)}</td>
+      <td></td>
+      <td class="text-right">${formatCurrency(totalTax)}</td>
+    </tr>
+  </tbody>
+</table>`}
+
+</div>
+
+<div id="${taxCode}-qlyhoadon" class="tab-content">
+  <h4>📥 Quản lý Hóa đơn đầu vào</h4>
+  <div id="${taxCode}-invoiceTablePlaceholder"></div>
+</div>
+
+<div id="${taxCode}-xuathang" class="tab-content">
+  <div id="${taxCode}-exportTabPlaceholder"></div>
+  <div style="margin-top: 20px;">
+    <h4>📜 Lịch sử xuất hàng</h4>
+    <div id="${taxCode}-exportHistoryTable"></div>
+  </div>
+</div>
+`;
+
+    // Sau khi innerHTML gán xong: gán nội dung động
+    const invoiceTable = document.getElementById(`${taxCode}-invoiceTablePlaceholder`);
+    if (invoiceTable) invoiceTable.innerHTML = renderInvoiceManagementTable(hkd);
+
+    const exportTab = document.getElementById(`${taxCode}-exportTabPlaceholder`);
+    if (exportTab) exportTab.innerHTML = renderExportTab(hkd, taxCode);
+
+    const exportHistoryTable = document.getElementById(`${taxCode}-exportHistoryTable`);
+    if (exportHistoryTable) exportHistoryTable.innerHTML = renderExportHistory(taxCode);
 }
 
 function resetHKDReport(taxCode) {
@@ -2078,9 +2048,9 @@ function generateOptimizedExport(taxCode, amount, mode = 'auto') {
 
     const excludeDiscount = document.getElementById("boHangChietKhau")?.checked;
     let products = hkd.inventory.filter(item =>
-    parseFloat(item.quantity) > 0 &&
-    (!excludeDiscount || item.category !== "chiet_khau")
-);
+        parseFloat(item.quantity) > 0 &&
+        (!excludeDiscount || item.category !== "chiet_khau")
+    );
 
 
     products.sort(() => Math.random() - 0.5);
@@ -2366,17 +2336,17 @@ function showManualExportPopup(taxCode) {
         buyerInfo,
         mode: 'manual',
         manualSelections: hkd.inventory
-    .filter(item => parseFloat(item.quantity) > 0)
-    .map(item => ({
-        ...item,
-        _originalQuantity: parseFloat(item.quantity), // ✅ lưu tồn kho gốc
-        quantity: 0
-    }))
+            .filter(item => parseFloat(item.quantity) > 0)
+            .map(item => ({
+                ...item,
+                _originalQuantity: parseFloat(item.quantity), // ✅ lưu tồn kho gốc
+                quantity: 0
+            }))
 
 
     };
 
-   const rows = exportDraft.manualSelections.map((p, i) => `
+    const rows = exportDraft.manualSelections.map((p, i) => `
     <tr>
         <td>${i + 1}</td>
         <td>${p.name}</td>
