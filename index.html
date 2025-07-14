@@ -136,15 +136,12 @@
 </head>
 <body>
   <header>
+    <button onclick="toggleSidebarMobile()" class="mobile-only">☰ HKD</button>
     <button onclick="document.getElementById('zipFile').click()">📁 Chọn file</button>
     <input type="file" id="zipFile" accept=".zip" multiple style="display: none;">
-    <button onclick="exportData()">📤 Xuất dữ liệu</button>
     <button onclick="clearAll()">🗑️ Xoá toàn bộ</button>
     <button onclick="undoAction()">🔁 Undo</button>
-    <button onclick="summarize()">📊 Tổng kết</button>
-    <button onclick="uploadToGitHub()">⬆️ Đẩy lên GitHub</button>
     <button onclick="searchHKD()">🔍 Tìm kiếm</button>
-    <button onclick="toggleSidebarMobile()" class="mobile-only">☰ HKD</button>
   </header>
 
   <div class="container">
