@@ -26,11 +26,13 @@
       display: flex;
       flex-wrap: nowrap;
       overflow-x: auto;
+      align-items: center;
       gap: 10px;
     }
 
-    header button {
-      padding: 8px 15px;
+    header button,
+    header label {
+      padding: 8px 12px;
       border: none;
       border-radius: 4px;
       background-color: #3498db;
@@ -38,10 +40,14 @@
       cursor: pointer;
       font-size: 14px;
       white-space: nowrap;
-      flex-shrink: 0;
     }
 
-    header button:hover {
+    header label input {
+      margin-right: 5px;
+    }
+
+    header button:hover,
+    header label:hover {
       background-color: #2980b9;
     }
 
@@ -59,8 +65,7 @@
       overflow-y: auto;
       position: sticky;
       top: 0;
-      height: calc(100vh - 60px);
-      z-index: 10;
+      height: 100vh;
     }
 
     .sidebar h3 {
@@ -78,14 +83,14 @@
       border-bottom: 1px solid #4a6278;
     }
 
-    .sidebar li:hover, .sidebar li.active {
+    .sidebar li:hover,
+    .sidebar li.active {
       background-color: #4a6278;
     }
 
     .main {
       flex: 1;
       padding: 20px;
-      overflow-x: auto;
       overflow-y: auto;
     }
 
@@ -97,64 +102,38 @@
       min-height: 100%;
     }
 
-    .hide-mobile {
-      display: table-cell;
-    }
-
-    .very-narrow {
-      width: 50px;
-      white-space: nowrap;
-      font-size: 12px;
-    }
-
-    .narrow {
-      width: 80px;
-      white-space: nowrap;
-    }
-
-    .hide-mobile-row {
-      display: table-row;
-    }
-
     @media (max-width: 768px) {
-      .container {
-        flex-direction: column;
-      }
-
       .sidebar {
         display: none;
         position: fixed;
-        top: 60px;
-        left: 0;
+        z-index: 1000;
         width: 80%;
-        max-width: 300px;
-        height: calc(100vh - 60px);
-        z-index: 100;
-        background: #2c3e50;
-        overflow-y: auto;
-        transition: transform 0.3s ease;
+        height: 100%;
+        left: 0;
+        top: 0;
+        background-color: #2c3e50;
       }
-
       .sidebar.show {
         display: block;
       }
+    }
 
-      .main {
-        padding: 10px;
-      }
+    /* COMPACT MODE */
+    .compact-mode .tonkho-table .col-maKH,
+    .compact-mode .tonkho-table .col-phanloai,
+    .compact-mode .hoadon-table .col-tontruoc,
+    .compact-mode .hoadon-table .col-tonsau {
+      display: none;
+    }
 
-      .hide-mobile {
-        display: none !important;
-      }
-
-      .hide-mobile-row {
-        display: none !important;
-      }
+    .compact-mode table td,
+    .compact-mode table th {
+      padding: 4px;
+      font-size: 12px;
     }
   </style>
 </head>
 <body>
-  <!-- HEADER -->
   <header>
     <input type="file" id="zipFile" accept=".zip" multiple style="display: none;">
     <button onclick="document.getElementById('zipFile').click()">📁 Chọn file</button>
@@ -164,6 +143,7 @@
     <button onclick="summarize()">📊 Tổng kết</button>
     <button onclick="uploadToGitHub()">⬆️ Đẩy lên GitHub</button>
     <button onclick="searchHKD()">🔍 Tìm kiếm</button>
+    <label><input type="checkbox" id="compactToggle" onchange="toggleCompact()"> 🧩 Tối giản</label>
   </header>
 
   <div class="container">
@@ -181,6 +161,11 @@
     </div>
   </div>
 
+  <script>
+    function toggleCompact() {
+      document.body.classList.toggle('compact-mode');
+    }
+  </script>
   <script src="script.js"></script>
 </body>
 </html>
