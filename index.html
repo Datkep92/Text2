@@ -26,8 +26,9 @@
       background-color: #2c3e50;
       padding: 10px;
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      white-space: nowrap;
       gap: 10px;
     }
 
@@ -39,6 +40,7 @@
       color: white;
       cursor: pointer;
       font-size: 14px;
+      flex-shrink: 0;
     }
 
     header button:hover {
@@ -50,6 +52,7 @@
       display: flex;
       flex-direction: row;
       min-height: 0;
+      position: relative;
     }
 
     .sidebar {
@@ -58,6 +61,15 @@
       color: white;
       padding: 15px;
       overflow-y: auto;
+      position: sticky;
+      top: 0;
+      height: calc(100vh - 60px);
+      flex-shrink: 0;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar.hidden {
+      transform: translateX(-100%);
     }
 
     .sidebar h3 {
@@ -75,7 +87,8 @@
       border-bottom: 1px solid #4a6278;
     }
 
-    .sidebar li:hover, .sidebar li.active {
+    .sidebar li:hover,
+    .sidebar li.active {
       background-color: #4a6278;
     }
 
@@ -93,24 +106,41 @@
       min-height: 100%;
     }
 
+    .mobile-toggle {
+      display: none;
+      background: #3498db;
+      color: white;
+      padding: 8px 10px;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
     @media (max-width: 768px) {
       .container {
         flex-direction: column;
       }
 
       .sidebar {
-        width: 100%;
-        order: 1;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 50px;
+        height: calc(100vh - 50px);
+        background: #34495e;
+        transform: translateX(-100%);
+      }
+
+      .sidebar.show {
+        transform: translateX(0);
+      }
+
+      .mobile-toggle {
+        display: block;
       }
 
       .main {
-        order: 2;
         padding: 10px;
-      }
-
-      header {
-        flex-direction: column;
-        align-items: stretch;
       }
     }
   </style>
@@ -118,6 +148,7 @@
 <body>
   <!-- HEADER -->
   <header>
+    <button class="mobile-toggle" onclick="document.getElementById('hkdList').classList.toggle('show')">📂 Danh sách HKD</button>
     <input type="file" id="zipFile" accept=".zip" multiple style="display: none;">
     <button onclick="document.getElementById('zipFile').click()">📁 Chọn file</button>
     <button onclick="exportData()">📤 Xuất dữ liệu</button>
